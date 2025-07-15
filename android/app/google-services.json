@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1088106376530",
+    "project_id": "moneymaster-5772c",
+    "storage_bucket": "moneymaster-5772c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1088106376530:android:f6025be1602924ba691e8b",
+        "android_client_info": {
+          "package_name": "com.example.money_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0PvnXLRaopL2oMsmc-jTyYvn4pszDn1A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
