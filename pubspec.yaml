@@ -39,6 +39,7 @@ dependencies:
   image: ^4.1.7
   image_picker: ^1.0.7
   intl: ^0.20.2
+  pie_chart: ^5.4.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0
