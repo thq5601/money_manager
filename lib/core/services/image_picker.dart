@@ -23,7 +23,6 @@ class ImagePickerService {
         return null;
       }
     } catch (e) {
-      print('Error picking image: $e');
       return null;
     }
   }
@@ -47,7 +46,6 @@ class ImagePickerService {
       // Convert to Base64
       return base64Encode(compressedBytes);
     } catch (e) {
-      print('Error compressing image: $e');
       return null;
     }
   }

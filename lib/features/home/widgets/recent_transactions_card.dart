@@ -6,7 +6,7 @@ import 'package:money_manager/core/widgets/category_icon.dart';
 import 'package:intl/intl.dart';
 
 class RecentTransactionsCard extends StatelessWidget {
-  const RecentTransactionsCard({Key? key}) : super(key: key);
+  const RecentTransactionsCard({super.key});
 
   String _formatVND(num amount) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
@@ -88,7 +88,7 @@ class RecentTransactionsCard extends StatelessWidget {
                     child: Row(
                       children: [
                         CircleAvatar(
-                          backgroundColor: color.withOpacity(0.18),
+                          backgroundColor: color.withValues(alpha: 0.18),
                           child: CategoryIcon(category: category, color: color),
                         ),
                         const SizedBox(width: 12),

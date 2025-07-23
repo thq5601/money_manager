@@ -12,11 +12,11 @@ class TransactionScreen extends StatelessWidget {
   final String? selectedType;
 
   const TransactionScreen({
-    Key? key,
+    super.key,
     this.searchQuery = '',
     this.selectedCategories = const {},
     this.selectedType,
-  }) : super(key: key);
+  });
 
   String _formatVND(num amount) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');

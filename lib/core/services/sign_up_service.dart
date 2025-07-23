@@ -28,9 +28,6 @@ class SignUpService {
       // Store additional user data in Firestore
       if (userCredential.user != null) {
         try {
-          print(
-            'Storing user data in Firestore for user: ${userCredential.user!.uid}',
-          );
           await _firestore
               .collection('users')
               .doc(userCredential.user!.uid)
@@ -41,9 +38,7 @@ class SignUpService {
                 'lastLoginAt': FieldValue.serverTimestamp(),
                 'isActive': true,
               });
-          print('User data stored successfully in Firestore');
         } catch (firestoreError) {
-          print('Error storing user data in Firestore: $firestoreError');
           // Don't throw here, as the user account was created successfully
           // You might want to handle this differently based on your requirements
         }
@@ -73,16 +68,11 @@ class SignUpService {
       // Update last login timestamp
       if (userCredential.user != null) {
         try {
-          print(
-            'Updating last login timestamp for user: ${userCredential.user!.uid}',
-          );
           await _firestore
               .collection('users')
               .doc(userCredential.user!.uid)
               .update({'lastLoginAt': FieldValue.serverTimestamp()});
-          print('Last login timestamp updated successfully');
         } catch (firestoreError) {
-          print('Error updating last login timestamp: $firestoreError');
           // Don't throw here, as the user signed in successfully
         }
       }
@@ -110,7 +100,6 @@ class SignUpService {
     try {
       return _auth.currentUser;
     } catch (e) {
-      print('Error getting current user: $e');
       return null;
     }
   }
@@ -120,7 +109,6 @@ class SignUpService {
     try {
       return _auth.currentUser != null;
     } catch (e) {
-      print('Error checking if user is signed in: $e');
       return false;
     }
   }
@@ -212,7 +200,6 @@ class SignUpService {
     try {
       return _auth.authStateChanges();
     } catch (e) {
-      print('Error setting up auth state changes: $e');
       return Stream.value(null);
     }
   }

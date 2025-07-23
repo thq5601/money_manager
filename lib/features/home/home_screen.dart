@@ -26,7 +26,7 @@ final currencyFormatVND = NumberFormat.currency(
 );
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
+  const HomeScreen({super.key, this.initialTabIndex = 0});
 
   final int initialTabIndex;
 
@@ -126,7 +126,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _budgetWarnings = [];
         _loadingBudgetWarnings = false;
       });
-      print('No user logged in');
       return;
     }
     final now = DateTime.now();
@@ -136,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         .collection('budgets')
         .where('userId', isEqualTo: user.uid)
         .get();
-    print('Budgets found: ${budgetsSnap.docs.length}');
     final txSnap = await FirebaseFirestore.instance
         .collection('transactions')
         .where('userId', isEqualTo: user.uid)
@@ -149,10 +147,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
         )
         .get();
-    print('Transactions found: ${txSnap.docs.length}');
     final Map<String, double> spentByCategory = {};
     for (final doc in txSnap.docs) {
-      final data = doc.data() as Map<String, dynamic>;
+      final data = doc.data();
       final category = data['category'] as String?;
       final amount = (data['amount'] ?? 0).toDouble();
       if (category != null && amount < 0) {
@@ -160,7 +157,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             (spentByCategory[category] ?? 0) + amount.abs();
       }
     }
-    print('Spent by category: ${spentByCategory.toString()}');
     final List<_BudgetWarning> warnings = [];
     for (final doc in budgetsSnap.docs) {
       final data = doc.data();
@@ -181,9 +177,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
     }
-    print(
-      'Budget warnings: ${warnings.map((w) => '{cat: ${w.category}, spent: ${w.spent}, limit: ${w.limit}, percent: ${w.percent}}').toList()}',
-    );
     setState(() {
       _budgetWarnings = warnings;
       _loadingBudgetWarnings = false;
@@ -191,10 +184,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // Expose a static method to refresh budget warnings from outside
-  static _HomeScreenState? of(BuildContext context) {
-    final state = context.findAncestorStateOfType<_HomeScreenState>();
-    return state;
-  }
 
   void refreshBudgetWarnings() => _fetchBudgetWarnings();
 
@@ -228,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CircleAvatar(
-                      backgroundColor: color.withOpacity(0.13),
+                      backgroundColor: color.withValues(alpha: 0.13),
                       child: CategoryIcon(category: w.category, color: color),
                     ),
                     const SizedBox(width: 12),
@@ -257,10 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Expensed: ' +
-                                format.format(w.spent) +
-                                ' / ' +
-                                format.format(w.limit),
+                            'Expensed: ${format.format(w.spent)} / ${format.format(w.limit)}',
                             style: const TextStyle(fontSize: 14),
                           ),
                         ],
@@ -327,51 +313,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // --- Transaction Filtering Logic ---
-  List<Map<String, dynamic>> get _filteredTransactions {
-    // Use the same sample data as TransactionScreen for now
-    final all = [
-      {
-        'date': '2024-07-23',
-        'description': 'Grocery Shopping',
-        'amount': -50.0,
-        'type': 'Expense',
-        'category': 'food',
-      },
-      {
-        'date': '2024-07-23',
-        'description': 'Coffee',
-        'amount': -3.5,
-        'type': 'Expense',
-        'category': 'food',
-      },
-      {
-        'date': '2024-07-22',
-        'description': 'Salary',
-        'amount': 1500.0,
-        'type': 'Income',
-        'category': 'salary',
-      },
-      {
-        'date': '2024-07-21',
-        'description': 'Book',
-        'amount': -12.0,
-        'type': 'Expense',
-        'category': 'education',
-      },
-    ];
-    return all.where((tx) {
-      final matchesQuery =
-          _searchQuery.isEmpty ||
-          tx['description'].toString().toLowerCase().contains(
-            _searchQuery.toLowerCase(),
-          );
-      final matchesCategory =
-          _selectedCategories.isEmpty ||
-          _selectedCategories.contains(tx['category']);
-      final matchesType = _selectedType == null || tx['type'] == _selectedType;
-      return matchesQuery && matchesCategory && matchesType;
-    }).toList();
-  }
 
   Widget _buildAppBar() {
     return CustomAppBar(
@@ -484,12 +425,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -545,17 +488,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // RecentTransactionsCard is now a separate widget
 
-  Widget _buildAnalytics() {
-    return Center(
-      child: EmptyState(
-        icon: Icons.analytics_outlined,
-        title: 'Analytics coming soon...',
-        subtitle: 'Charts and insights will be available here',
-        showAnimation: false,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -602,9 +534,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     // TODO: Refresh transactions after adding
                   },
                   backgroundColor: AppColors.green,
-                  child: const Icon(Icons.add, color: Colors.white, size: 32),
                   elevation: 4,
                   shape: const CircleBorder(),
+                  child: const Icon(Icons.add, color: Colors.white, size: 32),
                 ),
           bottomNavigationBar: FloatingBottomNavigationBar(
             currentIndex: _currentIndex,

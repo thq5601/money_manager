@@ -10,14 +10,14 @@ class CustomAppBar extends StatelessWidget {
   final VoidCallback? onStopSearch;
 
   const CustomAppBar({
-    Key? key,
+    super.key,
     required this.title,
     required this.actions,
     this.isSearching = false,
     this.searchController,
     this.onSearchChanged,
     this.onStopSearch,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class CustomAppBar extends StatelessWidget {
           color: AppColors.cardBackground,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -58,7 +58,7 @@ class CustomAppBar extends StatelessWidget {
         color: AppColors.cardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),

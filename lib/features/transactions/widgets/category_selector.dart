@@ -7,11 +7,11 @@ class CategorySelector extends StatelessWidget {
   final List<String> categories;
   final ValueChanged<String?> onCategorySelected;
   const CategorySelector({
-    Key? key,
+    super.key,
     required this.selectedCategory,
     required this.categories,
     required this.onCategorySelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +45,9 @@ class CategorySelector extends StatelessWidget {
                 ],
               ),
               selected: selectedCategory == cat,
-              selectedColor: AppColors.categoryColors[cat]?.withOpacity(0.18),
+              selectedColor: AppColors.categoryColors[cat]?.withValues(
+                alpha: 0.18,
+              ),
               backgroundColor: AppColors.paleGrey,
               labelStyle: TextStyle(
                 color: selectedCategory == cat

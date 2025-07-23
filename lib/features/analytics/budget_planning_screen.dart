@@ -22,11 +22,12 @@ class VndInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     String digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty)
+    if (digits.isEmpty) {
       return newValue.copyWith(
         text: '',
         selection: TextSelection.collapsed(offset: 0),
       );
+    }
     final number = int.parse(digits);
     final newText = format.format(number);
     return TextEditingValue(
@@ -37,14 +38,13 @@ class VndInputFormatter extends TextInputFormatter {
 }
 
 class BudgetPlanningScreen extends StatefulWidget {
-  const BudgetPlanningScreen({Key? key}) : super(key: key);
+  const BudgetPlanningScreen({super.key});
 
   @override
   State<BudgetPlanningScreen> createState() => _BudgetPlanningScreenState();
 }
 
 class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
-  final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
   final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
 
@@ -188,14 +188,14 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
+                          color: Colors.white.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               blurRadius: 12,
                               offset: const Offset(0, 4),
                             ),
@@ -211,7 +211,7 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                                   CircleAvatar(
                                     backgroundColor: AppColors
                                         .categoryColors[category]!
-                                        .withOpacity(0.13),
+                                        .withValues(alpha: 0.13),
                                     child: CategoryIcon(
                                       category: category,
                                       color: AppColors.categoryColors[category],
@@ -244,8 +244,8 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                                           ),
                                         ),
                                         filled: true,
-                                        fillColor: Colors.white.withOpacity(
-                                          0.85,
+                                        fillColor: Colors.white.withValues(
+                                          alpha: 0.85,
                                         ),
                                         labelStyle: const TextStyle(
                                           fontWeight: FontWeight.w500,

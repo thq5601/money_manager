@@ -6,10 +6,10 @@ class FilterDialog extends StatefulWidget {
   final Set<String> initialCategories;
   final String? initialType;
   const FilterDialog({
-    Key? key,
+    super.key,
     required this.initialCategories,
     this.initialType,
-  }) : super(key: key);
+  });
 
   @override
   State<FilterDialog> createState() => _FilterDialogState();

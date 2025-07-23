@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'widgets/category_selector.dart';
 
 class AddTransactionScreen extends StatefulWidget {
-  const AddTransactionScreen({Key? key}) : super(key: key);
+  const AddTransactionScreen({super.key});
 
   @override
   State<AddTransactionScreen> createState() => _AddTransactionScreenState();
@@ -83,13 +83,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           'type': _type,
           'userId': user.uid,
         });
-        if (mounted) {
-          setState(() => _isSaving = false);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Transaction added!')));
-          Navigator.pop(context);
-        }
+        if (!context.mounted) return;
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Transaction added!')));
+        Navigator.pop(context);
       } catch (e) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(
@@ -153,8 +152,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       onChanged: _onAmountChanged,
                       validator: (val) {
                         if (_rawAmount == null) return 'Enter amount';
-                        if (_rawAmount! < 1000)
+                        if (_rawAmount! < 1000) {
                           return 'Amount must be at least 1,000 VND';
+                        }
                         return null;
                       },
                     ),

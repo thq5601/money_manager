@@ -5,11 +5,11 @@ class CategoryIcon extends StatelessWidget {
   final Color? color;
   final double size;
   const CategoryIcon({
-    Key? key,
+    super.key,
     required this.category,
     this.color,
     this.size = 24,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

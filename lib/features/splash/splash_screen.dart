@@ -150,9 +150,7 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       // Wait for Firebase to be initialized
       await FirebaseService.waitForInitialization();
-      print('Firebase is ready, proceeding to next screen');
     } catch (e) {
-      print('Firebase initialization error: $e');
       // Continue to next screen even if Firebase fails
       // You might want to show an error message or handle this differently
     }

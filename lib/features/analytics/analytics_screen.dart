@@ -3,13 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
-import 'package:pie_chart/pie_chart.dart';
 import 'package:money_manager/features/analytics/piechart.dart';
 import 'package:money_manager/features/analytics/summary_card.dart';
 import 'package:money_manager/core/widgets/category_icon.dart';
 
 class AnalyticsScreen extends StatefulWidget {
-  const AnalyticsScreen({Key? key}) : super(key: key);
+  const AnalyticsScreen({super.key});
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -78,13 +77,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
         final expensePieData = <String, double>{};
         expenseByCategory.forEach((cat, amt) {
-          if (amt > 0)
+          if (amt > 0) {
             expensePieData[cat[0].toUpperCase() + cat.substring(1)] = amt;
+          }
         });
         final incomePieData = <String, double>{};
         incomeByCategory.forEach((cat, amt) {
-          if (amt > 0)
+          if (amt > 0) {
             incomePieData[cat[0].toUpperCase() + cat.substring(1)] = amt;
+          }
         });
         final colorMap = <String, Color>{};
         expenseByCategory.forEach((cat, _) {
@@ -137,7 +138,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.green.withOpacity(0.08),
+                        color: AppColors.green.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -166,18 +167,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               Container(
                 decoration: BoxDecoration(
                   color: netBalance < 0
-                      ? AppColors.red.withOpacity(0.08)
-                      : AppColors.green.withOpacity(0.08),
+                      ? AppColors.red.withValues(alpha: 0.08)
+                      : AppColors.green.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
                       color: (netBalance < 0 ? AppColors.red : AppColors.green)
-                          .withOpacity(0.08),
+                          .withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
                   ],
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -258,7 +261,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                     style: TextButton.styleFrom(
                       backgroundColor: showExpense
-                          ? AppColors.red.withOpacity(0.08)
+                          ? AppColors.red.withValues(alpha: 0.08)
                           : Colors.transparent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -284,7 +287,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                     style: TextButton.styleFrom(
                       backgroundColor: !showExpense
-                          ? AppColors.green.withOpacity(0.08)
+                          ? AppColors.green.withValues(alpha: 0.08)
                           : Colors.transparent,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -356,41 +359,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _summaryCard(String label, double amount, Color color, IconData icon) {
-    final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(fontWeight: FontWeight.w600, color: color),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              format.format(amount),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _categoryTile(String category, double amount, Color color) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: color.withOpacity(0.13),
+        backgroundColor: color.withValues(alpha: 0.13),
         child: CategoryIcon(category: category, color: color),
       ),
       title: Text(category[0].toUpperCase() + category.substring(1)),

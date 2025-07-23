@@ -18,7 +18,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
         color: AppColors.cardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 8,
             offset: const Offset(0, -2),
             spreadRadius: 0,
@@ -70,7 +70,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.green.withOpacity(0.12)
+                              ? AppColors.green.withValues(alpha: 0.12)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(16),
                         ),

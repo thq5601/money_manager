@@ -97,7 +97,6 @@ class ProfileService {
         return await createUserProfile(user);
       }
     } catch (e) {
-      print('Error getting user profile: $e');
       return null;
     }
   }
@@ -119,7 +118,6 @@ class ProfileService {
 
       return profile;
     } catch (e) {
-      print('Error creating user profile: $e');
       rethrow;
     }
   }
@@ -133,7 +131,6 @@ class ProfileService {
           .update(updatedProfile.toMap());
       return true;
     } catch (e) {
-      print('Error updating user profile: $e');
       return false;
     }
   }
@@ -147,9 +144,7 @@ class ProfileService {
           'lastLoginAt': DateTime.now(),
         });
       }
-    } catch (e) {
-      print('Error updating last login: $e');
-    }
+    } catch (e) {}
   }
 
   // Logout user
@@ -157,7 +152,6 @@ class ProfileService {
     try {
       await _auth.signOut();
     } catch (e) {
-      print('Error logging out: $e');
       rethrow;
     }
   }
@@ -179,7 +173,6 @@ class ProfileService {
       });
       return true;
     } catch (e) {
-      print('Error removing profile picture: $e');
       return false;
     }
   }
@@ -201,7 +194,6 @@ class ProfileService {
       });
       return true;
     } catch (e) {
-      print('Error updating profile picture: $e');
       return false;
     }
   }

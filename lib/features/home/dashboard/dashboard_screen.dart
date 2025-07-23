@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import 'package:money_manager/widgets/dashboard_card.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
-import 'package:money_manager/core/services/profile_manager.dart';
-import 'package:money_manager/core/services/profile_service.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:money_manager/core/routes.dart';
 import 'package:money_manager/features/home/home_screen.dart';
 
 // This file is already modular. DashboardScreen is exported for use in HomeScreen and elsewhere.
 // No code change needed unless you want to further split widgets.
 class DashboardScreen extends StatelessWidget {
-  DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   final List<Map<String, dynamic>> transactions = const [
     {
@@ -194,11 +190,13 @@ class DashboardScreen extends StatelessWidget {
                               horizontal: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.green.withOpacity(0.08),
+                              color: AppColors.green.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.green.withOpacity(0.08),
+                                  color: AppColors.green.withValues(
+                                    alpha: 0.08,
+                                  ),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -240,11 +238,11 @@ class DashboardScreen extends StatelessWidget {
                               horizontal: 12,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.red.withOpacity(0.08),
+                              color: AppColors.red.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.red.withOpacity(0.08),
+                                  color: AppColors.red.withValues(alpha: 0.08),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -465,8 +463,8 @@ class DashboardScreen extends StatelessWidget {
                                                 vertical: 2,
                                               ),
                                           leading: CircleAvatar(
-                                            backgroundColor: color.withOpacity(
-                                              0.13,
+                                            backgroundColor: color.withValues(
+                                              alpha: 0.13,
                                             ),
                                             child: Icon(icon, color: color),
                                           ),
@@ -523,7 +521,7 @@ class DashboardScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.13),
+                    color: Colors.black.withValues(alpha: 0.13),
                     blurRadius: 18,
                     offset: const Offset(0, 8),
                   ),
@@ -544,9 +542,9 @@ class DashboardScreen extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: child,
         ),

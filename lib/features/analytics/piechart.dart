@@ -16,8 +16,8 @@ class AnalyticsPieChart extends StatelessWidget {
     required this.dataMap,
     required this.colorMap,
     this.chartKey,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {

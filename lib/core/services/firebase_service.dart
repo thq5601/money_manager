@@ -23,7 +23,7 @@ class FirebaseService {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('Firebase initialized successfully');
+      // print('Firebase initialized successfully');
 
       // Test Firebase Auth
       try {
@@ -49,11 +49,15 @@ class FirebaseService {
   static FirebaseAuth get auth => FirebaseAuth.instance;
 
   /// Wait for Firebase to be initialized
-  static Future<void> waitForInitialization({Duration timeout = const Duration(seconds: 10)}) async {
+  static Future<void> waitForInitialization({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final startTime = DateTime.now();
     while (!_isInitialized) {
       if (DateTime.now().difference(startTime) > timeout) {
-        throw Exception('Firebase initialization timeout after ${timeout.inSeconds} seconds');
+        throw Exception(
+          'Firebase initialization timeout after ${timeout.inSeconds} seconds',
+        );
       }
       await Future.delayed(const Duration(milliseconds: 100));
     }
