@@ -3,6 +3,8 @@ import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:money_manager/core/widgets/category_icon.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 class TransactionScreen extends StatelessWidget {
   final String searchQuery;
@@ -19,43 +21,6 @@ class TransactionScreen extends StatelessWidget {
   String _formatVND(num amount) {
     final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     return format.format(amount);
-  }
-
-  IconData _categoryIcon(String? category, String type) {
-    switch (category) {
-      case 'salary':
-        return Icons.attach_money;
-      case 'freelance':
-        return Icons.laptop_mac;
-      case 'investment':
-        return Icons.trending_up;
-      case 'business':
-        return Icons.business_center;
-      case 'otherIncome':
-        return Icons.account_balance_wallet;
-      case 'food':
-        return Icons.restaurant_menu;
-      case 'transportation':
-        return Icons.directions_car;
-      case 'shopping':
-        return Icons.shopping_bag;
-      case 'entertainment':
-        return Icons.movie;
-      case 'healthcare':
-        return Icons.local_hospital;
-      case 'education':
-        return Icons.school;
-      case 'housing':
-        return Icons.home;
-      case 'utilities':
-        return Icons.lightbulb;
-      case 'insurance':
-        return Icons.security;
-      case 'otherExpense':
-        return Icons.more_horiz;
-      default:
-        return type == 'Income' ? Icons.arrow_downward : Icons.arrow_upward;
-    }
   }
 
   Color _categoryColor(String? category, String type) {
@@ -163,36 +128,64 @@ class TransactionScreen extends StatelessWidget {
                   final category = data['category'];
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        leading: CircleAvatar(
-                          backgroundColor: _categoryColor(category, type),
-                          child: Icon(
-                            _categoryIcon(category, type),
-                            color: Colors.white,
+                    child: Slidable(
+                      key: ValueKey(doc.id),
+                      endActionPane: ActionPane(
+                        motion: const DrawerMotion(),
+                        extentRatio: 0.25,
+                        children: [
+                          SlidableAction(
+                            onPressed: (_) async {
+                              await FirebaseFirestore.instance
+                                  .collection('transactions')
+                                  .doc(doc.id)
+                                  .delete();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Transaction deleted'),
+                                  ),
+                                );
+                              }
+                            },
+                            backgroundColor: AppColors.red,
+                            foregroundColor: Colors.white,
+                            icon: Icons.delete,
+                            label: 'Delete',
                           ),
+                        ],
+                      ),
+                      child: Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        title: Text(
-                          data['description'] ?? '',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        trailing: Text(
-                          (amount > 0 ? '+' : '-') +
-                              _formatVND((amount as num).abs()),
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: type == 'Income'
-                                ? AppColors.success
-                                : AppColors.error,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          leading: CircleAvatar(
+                            backgroundColor: _categoryColor(category, type),
+                            child: CategoryIcon(
+                              category: category,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(
+                            data['description'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          trailing: Text(
+                            (amount > 0 ? '+' : '-') +
+                                _formatVND((amount as num).abs()),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: type == 'Income'
+                                  ? AppColors.success
+                                  : AppColors.error,
+                            ),
                           ),
                         ),
                       ),
