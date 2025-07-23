@@ -6,11 +6,24 @@ import 'package:money_manager/core/services/sign_up_service.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:money_manager/widgets/empty_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'package:money_manager/features/transactions/transaction_screen.dart';
 import 'package:money_manager/features/transactions/add_transaction_screen.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:money_manager/features/analytics/analytics_screen.dart';
+import 'dart:ui';
+import 'widgets/filter_dialog.dart';
+import 'widgets/custom_app_bar.dart';
+import 'package:money_manager/core/widgets/category_icon.dart';
+import 'package:money_manager/core/utils/format.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
+
+final currencyFormatVND = NumberFormat.currency(
+  locale: 'vi_VN',
+  symbol: '₫',
+  decimalDigits: 0,
+);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
@@ -31,15 +44,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // --- Search & Filter State ---
   String _searchQuery = '';
 
+  // Budget warning state
+  List<_BudgetWarning> _budgetWarnings = [];
+  bool _loadingBudgetWarnings = false;
+
   // Change selectedCategory to a Set for multi-select
   Set<String> _selectedCategories = {};
 
   DateTime _selectedMonth = DateTime.now();
   String? _selectedType; // 'Income' or 'Expense'
   late Animation<Offset> _slideAnimation;
+  // Firestore listeners
+  StreamSubscription? _budgetsSub;
+  StreamSubscription? _txSub;
+  String? _currentUserId;
 
   @override
   void dispose() {
+    _budgetsSub?.cancel();
+    _txSub?.cancel();
     _pageAnimationController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -67,6 +90,196 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
 
     _pageAnimationController.forward();
+    _setupRealtimeBudgetWarningListener();
+  }
+
+  Future<void> _setupRealtimeBudgetWarningListener() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    if (_currentUserId == user.uid) return; // Already listening
+    _currentUserId = user.uid;
+    _budgetsSub?.cancel();
+    _txSub?.cancel();
+    // Listen to budgets
+    _budgetsSub = FirebaseFirestore.instance
+        .collection('budgets')
+        .where('userId', isEqualTo: user.uid)
+        .snapshots()
+        .listen((_) => _fetchBudgetWarnings());
+    // Listen to transactions
+    _txSub = FirebaseFirestore.instance
+        .collection('transactions')
+        .where('userId', isEqualTo: user.uid)
+        .snapshots()
+        .listen((_) => _fetchBudgetWarnings());
+    // Initial fetch
+    await _fetchBudgetWarnings();
+  }
+
+  Future<void> _fetchBudgetWarnings() async {
+    setState(() {
+      _loadingBudgetWarnings = true;
+    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() {
+        _budgetWarnings = [];
+        _loadingBudgetWarnings = false;
+      });
+      print('No user logged in');
+      return;
+    }
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0);
+    final budgetsSnap = await FirebaseFirestore.instance
+        .collection('budgets')
+        .where('userId', isEqualTo: user.uid)
+        .get();
+    print('Budgets found: ${budgetsSnap.docs.length}');
+    final txSnap = await FirebaseFirestore.instance
+        .collection('transactions')
+        .where('userId', isEqualTo: user.uid)
+        .where(
+          'dateCreated',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth),
+        )
+        .where(
+          'dateCreated',
+          isLessThanOrEqualTo: Timestamp.fromDate(endOfMonth),
+        )
+        .get();
+    print('Transactions found: ${txSnap.docs.length}');
+    final Map<String, double> spentByCategory = {};
+    for (final doc in txSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final category = data['category'] as String?;
+      final amount = (data['amount'] ?? 0).toDouble();
+      if (category != null && amount < 0) {
+        spentByCategory[category] =
+            (spentByCategory[category] ?? 0) + amount.abs();
+      }
+    }
+    print('Spent by category: ${spentByCategory.toString()}');
+    final List<_BudgetWarning> warnings = [];
+    for (final doc in budgetsSnap.docs) {
+      final data = doc.data();
+      final category = data['category'] as String?;
+      final limit = (data['limit'] ?? 0).toDouble();
+      if (category != null && limit > 0) {
+        final spent = spentByCategory[category] ?? 0;
+        final percent = spent / limit;
+        if (percent >= 0.8) {
+          warnings.add(
+            _BudgetWarning(
+              category: category,
+              spent: spent,
+              limit: limit,
+              percent: percent,
+            ),
+          );
+        }
+      }
+    }
+    print(
+      'Budget warnings: ${warnings.map((w) => '{cat: ${w.category}, spent: ${w.spent}, limit: ${w.limit}, percent: ${w.percent}}').toList()}',
+    );
+    setState(() {
+      _budgetWarnings = warnings;
+      _loadingBudgetWarnings = false;
+    });
+  }
+
+  // Expose a static method to refresh budget warnings from outside
+  static _HomeScreenState? of(BuildContext context) {
+    final state = context.findAncestorStateOfType<_HomeScreenState>();
+    return state;
+  }
+
+  void refreshBudgetWarnings() => _fetchBudgetWarnings();
+
+  void _showBudgetWarningsDialog() {
+    if (_budgetWarnings.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 8),
+              Text(
+                'Budget Warnings',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 340,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: _budgetWarnings.length,
+              separatorBuilder: (_, __) => const Divider(height: 18),
+              itemBuilder: (context, i) {
+                final w = _budgetWarnings[i];
+                final color = w.percent >= 1.0 ? Colors.red : Colors.orange;
+                final format = currencyFormatVND;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: color.withOpacity(0.13),
+                      child: CategoryIcon(category: w.category, color: color),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            w.category[0].toUpperCase() +
+                                w.category.substring(1),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            w.percent >= 1.0
+                                ? 'Above limit!'
+                                : 'Reached more than 80% of limit',
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Expensed: ' +
+                                format.format(w.spent) +
+                                ' / ' +
+                                format.format(w.limit),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _onTabTapped(int index) {
@@ -78,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _selectedCategories.clear();
       _selectedType = null;
     });
+    if (index == 0) _fetchBudgetWarnings();
     _pageAnimationController.reset();
     _pageAnimationController.forward();
   }
@@ -99,188 +313,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _showFilterDialog() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        Set<String> tempCategories = {..._selectedCategories};
-        String? tempType = _selectedType;
-        final sortedCategories = AppColors.categoryColors.keys.toList()..sort();
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 8,
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: StatefulBuilder(
-              builder: (context, setState) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.filter_list, color: AppColors.green, size: 26),
-                      SizedBox(width: 10),
-                      Text(
-                        'Filter Transactions',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Categories',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final cat in sortedCategories)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            child: FilterChip(
-                              label: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _categoryIconForFilter(cat),
-                                    size: 18,
-                                    color: AppColors.categoryColors[cat],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(cat[0].toUpperCase() + cat.substring(1)),
-                                  if (tempCategories.contains(cat)) ...[
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: AppColors.categoryColors[cat],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              selected: tempCategories.contains(cat),
-                              selectedColor: AppColors.categoryColors[cat]
-                                  ?.withOpacity(0.18),
-                              backgroundColor: AppColors.paleGrey,
-                              labelStyle: TextStyle(
-                                color: tempCategories.contains(cat)
-                                    ? AppColors.categoryColors[cat]
-                                    : AppColors.textSecondary,
-                              ),
-                              shape: StadiumBorder(),
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    tempCategories.add(cat);
-                                  } else {
-                                    tempCategories.remove(cat);
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Divider(height: 24),
-                  const Text(
-                    'Type',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: ToggleButtons(
-                      borderRadius: BorderRadius.circular(16),
-                      isSelected: [
-                        tempType == null,
-                        tempType == 'Income',
-                        tempType == 'Expense',
-                      ],
-                      onPressed: (index) {
-                        setState(() {
-                          if (index == 0) tempType = null;
-                          if (index == 1) tempType = 'Income';
-                          if (index == 2) tempType = 'Expense';
-                        });
-                      },
-                      color: AppColors.textSecondary,
-                      selectedColor: Colors.white,
-                      fillColor: AppColors.green,
-                      children: const [
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Text('All'),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Text('Income'),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Text('Expense'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context, {
-                            'categories': <String>{},
-                            'type': null,
-                          });
-                        },
-                        child: const Text('Reset'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, {
-                          'categories': tempCategories,
-                          'type': tempType,
-                        }),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.green,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Apply',
-                          style: TextStyle(color: AppColors.white),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (context) => FilterDialog(
+        initialCategories: _selectedCategories,
+        initialType: _selectedType,
+      ),
     );
     if (result != null) {
       setState(() {
@@ -338,68 +374,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildAppBar() {
-    if (_currentIndex == 1 && _isSearching) {
-      // Show search bar
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search transactions...',
-                  border: InputBorder.none,
-                ),
-                onChanged: (val) {
-                  setState(() {
-                    _searchQuery = val;
-                  });
-                },
-              ),
-            ),
-            IconButton(icon: const Icon(Icons.close), onPressed: _stopSearch),
-          ],
-        ),
-      );
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Text(
-            _getAppBarTitle(),
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          ..._getAppBarActions(),
-        ],
-      ),
+    return CustomAppBar(
+      title: _getAppBarTitle(),
+      actions: _getAppBarActions(),
+      isSearching: _currentIndex == 1 && _isSearching,
+      searchController: _searchController,
+      onSearchChanged: () {
+        setState(() {
+          _searchQuery = _searchController.text;
+        });
+      },
+      onStopSearch: _stopSearch,
     );
   }
 
@@ -435,13 +420,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     switch (_currentIndex) {
       case 0:
+        // Notification button with badge
         return [
-          IconButton(
-            onPressed: () {
-              // TODO: Implement notifications
-            },
-            icon: const Icon(Icons.notifications_outlined),
-            color: AppColors.textSecondary,
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _budgetWarnings.isNotEmpty
+                    ? _showBudgetWarningsDialog
+                    : null,
+                icon: const Icon(Icons.notifications_outlined),
+                color: AppColors.textSecondary,
+              ),
+              if (_budgetWarnings.isNotEmpty)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ];
       default:
@@ -460,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           selectedType: _selectedType,
         );
       case 2:
-        return _buildAnalytics();
+        return const AnalyticsScreen();
       case 3:
         return const ProfileScreen();
       default:
@@ -469,120 +472,78 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildDashboard() {
-    return DashboardScreen();
-  }
-
-  Widget _buildRecentTransactionsCard() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return const SizedBox();
-    }
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('transactions')
-          .where('userId', isEqualTo: user.uid)
-          .orderBy('dateCreated', descending: true)
-          .limit(4)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-        final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) {
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: const [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 40,
-                    color: AppColors.grey,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'No recent transactions',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Recent Transactions',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    return ListView(
+      padding: const EdgeInsets.only(top: 0, bottom: 24),
+      children: [
+        // Budget Planning Glass Button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                ...docs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final amount = data['amount'] ?? 0;
-                  final type = data['type'] ?? 'Expense';
-                  final category = data['category'];
-                  final desc = data['description'] ?? '';
-                  final icon = _categoryIconForFilter(category);
-                  final color =
-                      AppColors.categoryColors[category] ??
-                      (type == 'Income' ? AppColors.success : AppColors.error);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    Navigator.of(context).pushNamed('/budget-planning');
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 20,
+                      horizontal: 20,
+                    ),
                     child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: color.withOpacity(0.18),
-                          child: Icon(icon, color: color),
+                      children: const [
+                        Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: AppColors.green,
+                          size: 32,
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            desc,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
+                            'Budget Planning',
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                            ),
                           ),
                         ),
-                        Text(
-                          (amount > 0 ? '+' : '-') +
-                              _formatVND((amount as num).abs()),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: type == 'Income'
-                                ? AppColors.success
-                                : AppColors.error,
-                          ),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          color: AppColors.green,
+                          size: 20,
                         ),
                       ],
                     ),
-                  );
-                }),
-              ],
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-      },
+        ),
+        // Recent Transactions Card removed
+        // Dashboard content
+        DashboardScreen(),
+      ],
     );
   }
 
-  String _formatVND(num amount) {
-    final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
-    return format.format(amount);
-  }
+  // RecentTransactionsCard is now a separate widget
 
   Widget _buildAnalytics() {
     return Center(
@@ -627,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          floatingActionButton: _currentIndex == 3
+          floatingActionButton: _currentIndex == 3 || _currentIndex == 2
               ? null
               : FloatingActionButton(
                   heroTag: 'main-fab',
@@ -655,39 +616,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-IconData _categoryIconForFilter(String? category) {
-  switch (category) {
-    case 'salary':
-      return Icons.attach_money;
-    case 'freelance':
-      return Icons.laptop_mac;
-    case 'investment':
-      return Icons.trending_up;
-    case 'business':
-      return Icons.business_center;
-    case 'otherIncome':
-      return Icons.account_balance_wallet;
-    case 'food':
-      return Icons.restaurant_menu;
-    case 'transportation':
-      return Icons.directions_car;
-    case 'shopping':
-      return Icons.shopping_bag;
-    case 'entertainment':
-      return Icons.movie;
-    case 'healthcare':
-      return Icons.local_hospital;
-    case 'education':
-      return Icons.school;
-    case 'housing':
-      return Icons.home;
-    case 'utilities':
-      return Icons.lightbulb;
-    case 'insurance':
-      return Icons.security;
-    case 'otherExpense':
-      return Icons.more_horiz;
-    default:
-      return Icons.category;
-  }
+// Helper class for budget warnings
+class _BudgetWarning {
+  final String category;
+  final double spent;
+  final double limit;
+  final double percent;
+  _BudgetWarning({
+    required this.category,
+    required this.spent,
+    required this.limit,
+    required this.percent,
+  });
 }
