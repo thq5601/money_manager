@@ -11,6 +11,8 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:money_manager/core/routes.dart';
 import 'package:money_manager/features/home/home_screen.dart';
 
+// This file is already modular. DashboardScreen is exported for use in HomeScreen and elsewhere.
+// No code change needed unless you want to further split widgets.
 class DashboardScreen extends StatelessWidget {
   DashboardScreen({Key? key}) : super(key: key);
 
@@ -106,7 +108,17 @@ class DashboardScreen extends StatelessWidget {
               double totalExpense = 0;
               double totalBalance = 0;
               if (snapshot.hasData) {
-                for (final doc in snapshot.data!.docs) {
+                final now = DateTime.now();
+                final monthDocs = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final ts = data['dateCreated'];
+                  if (ts is Timestamp) {
+                    final date = ts.toDate();
+                    return date.year == now.year && date.month == now.month;
+                  }
+                  return false;
+                }).toList();
+                for (final doc in monthDocs) {
                   final data = doc.data() as Map<String, dynamic>;
                   final amount = (data['amount'] ?? 0).toDouble();
                   if (amount > 0) {
@@ -541,26 +553,4 @@ class DashboardScreen extends StatelessWidget {
       ),
     );
   }
-
-  // Widget _buildBalanceChart() {
-  //   // Placeholder for a chart. Replace with a real chart widget if needed.
-  //   return Container(
-  //     height: 120,
-  //     margin: const EdgeInsets.symmetric(vertical: 12),
-  //     decoration: BoxDecoration(
-  //       color: Colors.white.withOpacity(0.15),
-  //       borderRadius: BorderRadius.circular(18),
-  //     ),
-  //     child: const Center(
-  //       child: Text(
-  //         'Balance Chart Placeholder',
-  //         style: TextStyle(
-  //           color: AppColors.textSecondary,
-  //           fontSize: 16,
-  //           fontWeight: FontWeight.w500,
-  //         ),
-  //       ),
-  //     ),
-  //   );
-  // }
 }
