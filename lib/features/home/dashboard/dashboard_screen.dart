@@ -286,11 +286,43 @@ class DashboardScreen extends StatelessWidget {
                           child: InkWell(
                             borderRadius: BorderRadius.circular(8),
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const HomeScreen(initialTabIndex: 1),
+                              Navigator.of(context).push(
+                                PageRouteBuilder(
+                                  pageBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                      ) => const HomeScreen(initialTabIndex: 1),
+                                  transitionsBuilder:
+                                      (
+                                        context,
+                                        animation,
+                                        secondaryAnimation,
+                                        child,
+                                      ) {
+                                        final offsetAnimation =
+                                            Tween<Offset>(
+                                              begin: const Offset(1.0, 0.0),
+                                              end: Offset.zero,
+                                            ).animate(
+                                              CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeOutCubic,
+                                              ),
+                                            );
+                                        final fadeAnimation = CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeIn,
+                                        );
+                                        return SlideTransition(
+                                          position: offsetAnimation,
+                                          child: FadeTransition(
+                                            opacity: fadeAnimation,
+                                            child: child,
+                                          ),
+                                        );
+                                      },
                                 ),
                               );
                             },

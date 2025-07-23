@@ -13,8 +13,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  final int initialTabIndex;
   const HomeScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
+
+  final int initialTabIndex;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Change selectedCategory to a Set for multi-select
   Set<String> _selectedCategories = {};
+
   DateTime _selectedMonth = DateTime.now();
   String? _selectedType; // 'Income' or 'Expense'
   late Animation<Offset> _slideAnimation;
@@ -409,6 +411,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return 'Transactions';
       case 2:
         return 'Analytics';
+      case 3:
+        return 'Profile';
       default:
         return '';
     }
@@ -623,22 +627,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          floatingActionButton: FloatingActionButton(
-            heroTag: 'main-fab',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddTransactionScreen(),
+          floatingActionButton: _currentIndex == 3
+              ? null
+              : FloatingActionButton(
+                  heroTag: 'main-fab',
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddTransactionScreen(),
+                      ),
+                    );
+                    // TODO: Refresh transactions after adding
+                  },
+                  backgroundColor: AppColors.green,
+                  child: const Icon(Icons.add, color: Colors.white, size: 32),
+                  elevation: 4,
+                  shape: const CircleBorder(),
                 ),
-              );
-              // TODO: Refresh transactions after adding
-            },
-            backgroundColor: AppColors.green,
-            child: const Icon(Icons.add, color: Colors.white, size: 32),
-            elevation: 4,
-            shape: const CircleBorder(),
-          ),
           bottomNavigationBar: FloatingBottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: _onTabTapped,

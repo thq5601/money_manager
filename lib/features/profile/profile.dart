@@ -278,13 +278,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Center(child: Text('Failed to load profile'));
     }
 
-    return Container(
-      color: Colors.grey[100],
-      child: Column(
+    return Scaffold(
+      // appBar: AppBar(
+      //   title: const Text(
+      //     'Profile',
+      //     style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      //   ),
+      //   backgroundColor: Colors.white,
+      //   elevation: 0,
+      //   iconTheme: const IconThemeData(color: Colors.black),
+      // ),
+      backgroundColor: Colors.grey[100],
+      body: Column(
         children: [
           // Profile Header Card
           Card(
-            margin: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),

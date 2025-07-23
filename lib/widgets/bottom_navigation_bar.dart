@@ -18,7 +18,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
         color: AppColors.cardBackground,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.07),
             blurRadius: 8,
             offset: const Offset(0, -2),
             spreadRadius: 0,
@@ -28,85 +28,96 @@ class CustomBottomNavigationBar extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: Stack(
             children: [
-              _buildNavItem(
-                icon: Icons.home_rounded,
-                label: 'Home',
-                index: 0,
-                isSelected: currentIndex == 0,
+              // Animated indicator bar
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.fastOutSlowIn,
+                alignment: Alignment(-1 + (currentIndex * 2 / 3), 1),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 2),
+                  width: MediaQuery.of(context).size.width / 4 - 24,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.green,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
-              _buildNavItem(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Transactions',
-                index: 1,
-                isSelected: currentIndex == 1,
-              ),
-              _buildNavItem(
-                icon: Icons.analytics_rounded,
-                label: 'Analytics',
-                index: 2,
-                isSelected: currentIndex == 2,
-              ),
-              _buildNavItem(
-                icon: Icons.person_rounded,
-                label: 'Profile',
-                index: 3,
-                isSelected: currentIndex == 3,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(4, (index) {
+                  final navItems = [
+                    {'icon': Icons.home_rounded, 'label': 'Home'},
+                    {
+                      'icon': Icons.account_balance_wallet_rounded,
+                      'label': 'Transactions',
+                    },
+                    {'icon': Icons.analytics_rounded, 'label': 'Analytics'},
+                    {'icon': Icons.person_rounded, 'label': 'Profile'},
+                  ];
+                  final isSelected = currentIndex == index;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => onTap(index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 500),
+                        curve: Curves.fastOutSlowIn,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.green.withOpacity(0.12)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TweenAnimationBuilder<double>(
+                              tween: Tween<double>(
+                                begin: 1.0,
+                                end: isSelected ? 1.18 : 1.0,
+                              ),
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.fastOutSlowIn,
+                              builder: (context, scale, child) =>
+                                  Transform.scale(scale: scale, child: child),
+                              child: Icon(
+                                navItems[index]['icon'] as IconData,
+                                size: isSelected ? 26 : 22,
+                                color: isSelected
+                                    ? AppColors.green
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.fastOutSlowIn,
+                              style: TextStyle(
+                                fontSize: isSelected ? 15 : 13,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected
+                                    ? AppColors.green
+                                    : AppColors.textSecondary,
+                              ),
+                              child: Text(navItems[index]['label'] as String),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required int index,
-    required bool isSelected,
-  }) {
-    return GestureDetector(
-      onTap: () => onTap(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.green.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          border: isSelected
-              ? Border.all(color: AppColors.green, width: 1.5)
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              child: Icon(
-                icon,
-                size: 24,
-                color: isSelected ? AppColors.green : AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppColors.green : AppColors.textSecondary,
-              ),
-              child: Text(label),
-            ),
-          ],
         ),
       ),
     );
