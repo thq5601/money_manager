@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:money_manager/feature/splash/splash_screen.dart';
-import 'package:money_manager/feature/account_manager/login/login_screen.dart';
-import 'package:money_manager/feature/account_manager/sign_up/sign_up_screen.dart';
-import 'package:money_manager/feature/home/home_screen.dart';
-import 'package:money_manager/feature/profile/profile.dart';
+import 'package:money_manager/features/account_manager/login/login_screen.dart';
+import 'package:money_manager/features/account_manager/sign_up/sign_up_screen.dart';
+import 'package:money_manager/features/home/home_screen.dart';
+import 'package:money_manager/features/profile/profile.dart';
+import 'package:money_manager/features/splash/splash_screen.dart';
 
 class AppRoutes {
   // Route names
@@ -12,6 +12,7 @@ class AppRoutes {
   static const String signup = '/signup';
   static const String home = '/home';
   static const String profile = '/profile';
+  static const String transactions = '/transactions';
 
   // Route map for MaterialApp
   static Map<String, WidgetBuilder> get routes => {
@@ -35,6 +36,9 @@ class AppRoutes {
         return MaterialPageRoute(builder: (context) => const HomeScreen());
       case profile:
         return MaterialPageRoute(builder: (context) => const ProfileScreen());
+      case transactions:
+        // If you want to support deep linking to the transactions tab, handle it in HomeScreen
+        return MaterialPageRoute(builder: (context) => const HomeScreen());
       default:
         // Return splash screen for unknown routes
         return MaterialPageRoute(builder: (context) => const SplashScreen());
