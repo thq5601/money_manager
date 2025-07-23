@@ -20,7 +20,6 @@ class FirebaseService {
     _isInitializing = true;
 
     try {
-      print('Initializing Firebase...');
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
@@ -28,10 +27,8 @@ class FirebaseService {
 
       // Test Firebase Auth
       try {
-        final auth = FirebaseAuth.instance;
-        print('Firebase Auth instance created successfully');
+        // final auth = FirebaseAuth.instance;
       } catch (e) {
-        print('Error creating Firebase Auth instance: $e');
         _isInitializing = false;
         return false;
       }
@@ -40,7 +37,6 @@ class FirebaseService {
       _isInitializing = false;
       return true;
     } catch (e) {
-      print('Error initializing Firebase: $e');
       _isInitializing = false;
       return false;
     }
