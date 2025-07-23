@@ -13,7 +13,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex;
+  const HomeScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,7 +22,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final SignUpService _authService = SignUpService();
-  int _currentIndex = 0;
+  late int _currentIndex;
   late Animation<double> _fadeAnimation;
   bool _isSearching = false;
   late AnimationController _pageAnimationController;
@@ -45,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialTabIndex;
     _pageAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,

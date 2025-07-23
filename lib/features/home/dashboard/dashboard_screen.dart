@@ -7,6 +7,9 @@ import 'package:money_manager/core/services/profile_service.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:money_manager/core/routes.dart';
+import 'package:money_manager/features/home/home_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   DashboardScreen({Key? key}) : super(key: key);
@@ -153,10 +156,12 @@ class DashboardScreen extends StatelessWidget {
                               const SizedBox(height: 10),
                               Text(
                                 _formatVND(totalBalance),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 32,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.green,
+                                  color: totalBalance < 0
+                                      ? AppColors.red
+                                      : AppColors.green,
                                   letterSpacing: -1.2,
                                 ),
                               ),
@@ -280,7 +285,15 @@ class DashboardScreen extends StatelessWidget {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const HomeScreen(initialTabIndex: 1),
+                                ),
+                              );
+                            },
                             child: const Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -381,42 +394,65 @@ class DashboardScreen extends StatelessWidget {
                                   child: Transform.translate(
                                     offset: Offset(0, (1 - value) * 30),
                                     child: _glassCard(
-                                      child: ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 2,
+                                      child: Slidable(
+                                        key: ValueKey(doc.id),
+                                        endActionPane: ActionPane(
+                                          motion: const DrawerMotion(),
+                                          extentRatio: 0.25,
+                                          children: [
+                                            SlidableAction(
+                                              onPressed: (_) async {
+                                                await FirebaseFirestore.instance
+                                                    .collection('transactions')
+                                                    .doc(doc.id)
+                                                    .delete();
+                                              },
+                                              backgroundColor: AppColors.red,
+                                              foregroundColor: Colors.white,
+                                              icon: Icons.delete,
+                                              label: 'Delete',
                                             ),
-                                        leading: CircleAvatar(
-                                          backgroundColor: color.withOpacity(
-                                            0.13,
-                                          ),
-                                          child: Icon(icon, color: color),
+                                          ],
                                         ),
-                                        title: Text(
-                                          desc,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
+                                        child: ListTile(
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 2,
+                                              ),
+                                          leading: CircleAvatar(
+                                            backgroundColor: color.withOpacity(
+                                              0.13,
+                                            ),
+                                            child: Icon(icon, color: color),
                                           ),
-                                        ),
-                                        subtitle: Text(
-                                          dateStr,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: AppColors.textSecondary,
+                                          title: Text(
+                                            desc,
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
                                           ),
-                                        ),
-                                        trailing: Text(
-                                          (amount > 0 ? '+' : '-') +
-                                              _formatVND((amount as num).abs()),
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: type == 'Income'
-                                                ? AppColors.green
-                                                : AppColors.red,
+                                          subtitle: Text(
+                                            dateStr,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          trailing: Text(
+                                            (amount > 0 ? '+' : '-') +
+                                                _formatVND(
+                                                  (amount as num).abs(),
+                                                ),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: type == 'Income'
+                                                  ? AppColors.green
+                                                  : AppColors.red,
+                                            ),
                                           ),
                                         ),
                                       ),
