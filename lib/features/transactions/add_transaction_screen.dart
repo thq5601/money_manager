@@ -3,6 +3,7 @@ import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'widgets/category_selector.dart';
 
 class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({Key? key}) : super(key: key);
@@ -101,43 +102,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = AppColors.categoryColors.keys.toList()..sort();
-    IconData _categoryIcon(String? category) {
-      switch (category) {
-        case 'salary':
-          return Icons.attach_money;
-        case 'freelance':
-          return Icons.laptop_mac;
-        case 'investment':
-          return Icons.trending_up;
-        case 'business':
-          return Icons.business_center;
-        case 'otherIncome':
-          return Icons.account_balance_wallet;
-        case 'food':
-          return Icons.restaurant_menu;
-        case 'transportation':
-          return Icons.directions_car;
-        case 'shopping':
-          return Icons.shopping_bag;
-        case 'entertainment':
-          return Icons.movie;
-        case 'healthcare':
-          return Icons.local_hospital;
-        case 'education':
-          return Icons.school;
-        case 'housing':
-          return Icons.home;
-        case 'utilities':
-          return Icons.lightbulb;
-        case 'insurance':
-          return Icons.security;
-        case 'otherExpense':
-          return Icons.more_horiz;
-        default:
-          return Icons.category;
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -270,53 +234,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        for (final cat in categories)
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeInOut,
-                            child: ChoiceChip(
-                              label: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _categoryIcon(cat),
-                                    size: 18,
-                                    color: AppColors.categoryColors[cat],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(cat[0].toUpperCase() + cat.substring(1)),
-                                  if (_category == cat) ...[
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.check,
-                                      size: 16,
-                                      color: AppColors.categoryColors[cat],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              selected: _category == cat,
-                              selectedColor: AppColors.categoryColors[cat]
-                                  ?.withOpacity(0.18),
-                              backgroundColor: AppColors.paleGrey,
-                              labelStyle: TextStyle(
-                                color: _category == cat
-                                    ? AppColors.categoryColors[cat]
-                                    : AppColors.textSecondary,
-                              ),
-                              shape: const StadiumBorder(),
-                              onSelected: (selected) {
-                                setState(
-                                  () => _category = selected ? cat : null,
-                                );
-                              },
-                            ),
-                          ),
-                      ],
+                    CategorySelector(
+                      selectedCategory: _category,
+                      categories: categories,
+                      onCategorySelected: (cat) {
+                        setState(() => _category = cat);
+                      },
                     ),
                     if (_category == null)
                       const Padding(
