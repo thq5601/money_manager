@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:money_manager/core/widgets/category_icon.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
-class TransactionScreen extends StatelessWidget {
+class TransactionScreen extends StatefulWidget {
   final String searchQuery;
   final Set<String> selectedCategories;
   final String? selectedType;
@@ -18,8 +18,17 @@ class TransactionScreen extends StatelessWidget {
     this.selectedType,
   });
 
+  @override
+  State<TransactionScreen> createState() => _TransactionScreenState();
+}
+
+class _TransactionScreenState extends State<TransactionScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   String _formatVND(num amount) {
-    final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+    final format = NumberFormat.currency(locale: 'vi_VN', symbol: '\u20ab');
     return format.format(amount);
   }
 
@@ -32,6 +41,7 @@ class TransactionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return const Center(child: Text('Please log in to view transactions.'));
@@ -55,12 +65,14 @@ class TransactionScreen extends StatelessWidget {
           final data = doc.data() as Map<String, dynamic>;
           final desc = (data['description'] ?? '').toString().toLowerCase();
           final matchesQuery =
-              searchQuery.isEmpty || desc.contains(searchQuery.toLowerCase());
+              widget.searchQuery.isEmpty ||
+              desc.contains(widget.searchQuery.toLowerCase());
           final matchesCategory =
-              selectedCategories.isEmpty ||
-              selectedCategories.contains(data['category']);
+              widget.selectedCategories.isEmpty ||
+              widget.selectedCategories.contains(data['category']);
           final matchesType =
-              selectedType == null || data['type'] == selectedType;
+              widget.selectedType == null ||
+              data['type'] == widget.selectedType;
           return matchesQuery && matchesCategory && matchesType;
         }).toList();
         if (filteredDocs.isEmpty) {
