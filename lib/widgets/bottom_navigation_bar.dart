@@ -52,7 +52,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
                     {'icon': Icons.home_rounded, 'label': 'Home'},
                     {
                       'icon': Icons.account_balance_wallet_rounded,
-                      'label': 'Transactions',
+                      'label': 'Trans',
                     },
                     {'icon': Icons.analytics_rounded, 'label': 'Analytics'},
                     {'icon': Icons.person_rounded, 'label': 'Profile'},
@@ -166,7 +166,7 @@ class FloatingBottomNavigationBar extends StatelessWidget {
             Expanded(
               child: _buildNavItem(
                 icon: Icons.account_balance_wallet_rounded,
-                label: 'Transactions',
+                label: 'Trans',
                 index: 1,
                 isSelected: currentIndex == 1,
               ),
