@@ -143,7 +143,7 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Tất cả hạn mức đã được đặt lại về 0 ₫ (trước đó: \\${format.format(totalLimit)})',
+                            'All limit set to 0 ₫ (Previous: \\${format.format(totalLimit)})',
                           ),
                         ),
                       );
