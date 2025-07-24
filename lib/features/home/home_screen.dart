@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:money_manager/features/profile/profile.dart';
 import 'package:money_manager/widgets/bottom_navigation_bar.dart';
-
-import 'package:money_manager/core/services/sign_up_service.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
-import 'package:money_manager/widgets/empty_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard/dashboard_screen.dart';
@@ -15,9 +12,10 @@ import 'dart:ui';
 import 'widgets/filter_dialog.dart';
 import 'widgets/custom_app_bar.dart';
 import 'package:money_manager/core/widgets/category_icon.dart';
-import 'package:money_manager/core/utils/format.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:money_manager/bloc/home/home_bloc.dart';
 
 final currencyFormatVND = NumberFormat.currency(
   locale: 'vi_VN',
@@ -25,62 +23,50 @@ final currencyFormatVND = NumberFormat.currency(
   decimalDigits: 0,
 );
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, this.initialTabIndex = 0});
 
   final int initialTabIndex;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => HomeBloc(),
+      child: const _HomeScreenView(),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final SignUpService _authService = SignUpService();
-  late int _currentIndex;
+class _HomeScreenView extends StatefulWidget {
+  const _HomeScreenView({super.key});
+
+  @override
+  State<_HomeScreenView> createState() => _HomeScreenViewState();
+}
+
+class _HomeScreenViewState extends State<_HomeScreenView>
+    with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
-  bool _isSearching = false;
   late AnimationController _pageAnimationController;
-  final TextEditingController _searchController = TextEditingController();
-  // --- Search & Filter State ---
-  String _searchQuery = '';
-
-  // Budget warning state
-  List<_BudgetWarning> _budgetWarnings = [];
-  bool _loadingBudgetWarnings = false;
-
-  // Change selectedCategory to a Set for multi-select
-  Set<String> _selectedCategories = {};
-
-  DateTime _selectedMonth = DateTime.now();
-  String? _selectedType; // 'Income' or 'Expense'
   late Animation<Offset> _slideAnimation;
-  // Firestore listeners
+  final TextEditingController _searchController = TextEditingController();
+  GlobalKey _analyticsScreenKey = GlobalKey();
+  Timer? _searchDebounce;
+  bool _isSearching = false;
   StreamSubscription? _budgetsSub;
   StreamSubscription? _txSub;
   String? _currentUserId;
 
   @override
-  void dispose() {
-    _budgetsSub?.cancel();
-    _txSub?.cancel();
-    _pageAnimationController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialTabIndex;
     _pageAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _pageAnimationController, curve: Curves.easeOut),
     );
-
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
           CurvedAnimation(
@@ -88,9 +74,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             curve: Curves.easeOutCubic,
           ),
         );
-
-    _pageAnimationController.forward();
+    if (!_pageAnimationController.isCompleted) {
+      _pageAnimationController.forward();
+    }
     _setupRealtimeBudgetWarningListener();
+  }
+
+  @override
+  void dispose() {
+    _pageAnimationController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
+    _budgetsSub?.cancel();
+    _txSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _setupRealtimeBudgetWarningListener() async {
@@ -117,15 +114,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _fetchBudgetWarnings() async {
-    setState(() {
-      _loadingBudgetWarnings = true;
-    });
+    final bloc = context.read<HomeBloc>();
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() {
-        _budgetWarnings = [];
-        _loadingBudgetWarnings = false;
-      });
+      bloc.add(const HomeBudgetWarningsUpdated([]));
       return;
     }
     final now = DateTime.now();
@@ -177,18 +169,59 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
     }
+    bloc.add(HomeBudgetWarningsUpdated(warnings));
+  }
+
+  void _onTabTapped(int index) {
+    final bloc = context.read<HomeBloc>();
+    bloc.add(HomeTabChanged(index));
     setState(() {
-      _budgetWarnings = warnings;
-      _loadingBudgetWarnings = false;
+      _isSearching = false;
+    });
+    _pageAnimationController.reset();
+    _pageAnimationController.forward();
+  }
+
+  void _startSearch() {
+    setState(() {
+      _isSearching = true;
     });
   }
 
-  // Expose a static method to refresh budget warnings from outside
+  void _stopSearch() {
+    _searchController.clear();
+    setState(() {
+      _isSearching = false;
+    });
+    context.read<HomeBloc>().add(const HomeSearchChanged(''));
+  }
 
-  void refreshBudgetWarnings() => _fetchBudgetWarnings();
+  void _showFilterDialog() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => FilterDialog(
+        initialCategories: context.read<HomeBloc>().state.selectedCategories,
+        initialType: context.read<HomeBloc>().state.selectedType,
+      ),
+    );
+    if (result != null) {
+      context.read<HomeBloc>().add(
+        HomeFilterChanged(
+          (result['categories'] as Set<String>?) ?? {},
+          result['type'],
+        ),
+      );
+    }
+  }
 
-  void _showBudgetWarningsDialog() {
-    if (_budgetWarnings.isEmpty) return;
+  void _refreshAnalytics() {
+    setState(() {
+      _analyticsScreenKey = GlobalKey();
+    });
+  }
+
+  void _showBudgetWarningsDialog(List<dynamic> warnings) {
+    if (warnings.isEmpty) return;
     showDialog(
       context: context,
       builder: (context) {
@@ -207,17 +240,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             width: 340,
             child: ListView.separated(
               shrinkWrap: true,
-              itemCount: _budgetWarnings.length,
+              itemCount: warnings.length,
               separatorBuilder: (_, __) => const Divider(height: 18),
               itemBuilder: (context, i) {
-                final w = _budgetWarnings[i];
+                final w = warnings[i];
                 final color = w.percent >= 1.0 ? Colors.red : Colors.orange;
                 final format = currencyFormatVND;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     CircleAvatar(
-                      backgroundColor: color.withValues(alpha: 0.13),
+                      backgroundColor: color.withOpacity(0.13),
                       child: CategoryIcon(category: w.category, color: color),
                     ),
                     const SizedBox(width: 12),
@@ -268,69 +301,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _onTabTapped(int index) {
-    setState(() {
-      _currentIndex = index;
-      _isSearching = false;
-      _searchQuery = '';
-      _searchController.clear();
-      _selectedCategories.clear();
-      _selectedType = null;
-    });
-    if (index == 0) _fetchBudgetWarnings();
-    _pageAnimationController.reset();
-    _pageAnimationController.forward();
-  }
-
-  void _startSearch() {
-    setState(() {
-      _isSearching = true;
-    });
-  }
-
-  void _stopSearch() {
-    setState(() {
-      _isSearching = false;
-      _searchQuery = '';
-      _searchController.clear();
-    });
-  }
-
-  void _showFilterDialog() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => FilterDialog(
-        initialCategories: _selectedCategories,
-        initialType: _selectedType,
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _selectedCategories = (result['categories'] as Set<String>?) ?? {};
-        _selectedType = result['type'];
-      });
-    }
-  }
-
-  // --- Transaction Filtering Logic ---
-
-  Widget _buildAppBar() {
+  Widget _buildAppBar(HomeState state) {
     return CustomAppBar(
-      title: _getAppBarTitle(),
-      actions: _getAppBarActions(),
-      isSearching: _currentIndex == 1 && _isSearching,
+      title: _getAppBarTitle(state.currentIndex),
+      actions: _getAppBarActions(state),
+      isSearching: _isSearching,
       searchController: _searchController,
       onSearchChanged: () {
-        setState(() {
-          _searchQuery = _searchController.text;
+        _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            context.read<HomeBloc>().add(
+              HomeSearchChanged(_searchController.text),
+            );
+          }
         });
       },
       onStopSearch: _stopSearch,
     );
   }
 
-  String _getAppBarTitle() {
-    switch (_currentIndex) {
+  String _getAppBarTitle(int index) {
+    switch (index) {
       case 0:
         return 'Dashboard';
       case 1:
@@ -344,8 +336,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  List<Widget> _getAppBarActions() {
-    if (_currentIndex == 1) {
+  List<Widget> _getAppBarActions(HomeState state) {
+    if (state.currentIndex == 1) {
       return [
         IconButton(
           onPressed: _startSearch,
@@ -359,52 +351,61 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
       ];
     }
-    switch (_currentIndex) {
-      case 0:
-        // Notification button with badge
-        return [
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _budgetWarnings.isNotEmpty
-                    ? _showBudgetWarningsDialog
-                    : null,
-                icon: const Icon(Icons.notifications_outlined),
-                color: AppColors.textSecondary,
-              ),
-              if (_budgetWarnings.isNotEmpty)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
+    if (state.currentIndex == 2) {
+      return [
+        IconButton(
+          onPressed: _refreshAnalytics,
+          icon: const Icon(Icons.refresh),
+          color: AppColors.textSecondary,
+        ),
+      ];
+    }
+    // Notifications for dashboard
+    if (state.currentIndex == 0) {
+      return [
+        Stack(
+          children: [
+            IconButton(
+              onPressed: state.budgetWarnings.isNotEmpty
+                  ? () => _showBudgetWarningsDialog(state.budgetWarnings)
+                  : null,
+              icon: const Icon(Icons.notifications_outlined),
+              color: AppColors.textSecondary,
+            ),
+            if (state.budgetWarnings.isNotEmpty)
+              const Positioned(
+                right: 8,
+                top: 8,
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
                   ),
                 ),
-            ],
-          ),
-        ];
-      default:
-        return [];
+              ),
+          ],
+        ),
+      ];
     }
+    return const [];
   }
 
-  Widget _buildBody() {
-    switch (_currentIndex) {
+  Widget _buildBody(HomeState state) {
+    switch (state.currentIndex) {
       case 0:
         return _buildDashboard();
       case 1:
         return TransactionScreen(
-          searchQuery: _searchQuery,
-          selectedCategories: _selectedCategories,
-          selectedType: _selectedType,
+          searchQuery: state.searchQuery,
+          selectedCategories: state.selectedCategories,
+          selectedType: state.selectedType,
         );
       case 2:
-        return const AnalyticsScreen();
+        return AnalyticsScreen(key: _analyticsScreenKey);
       case 3:
         return const ProfileScreen();
       default:
@@ -415,104 +416,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildDashboard() {
     return ListView(
       padding: const EdgeInsets.only(top: 0, bottom: 24),
-      children: [
-        // Budget Planning Glass Button
+      children: const [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () {
-                    Navigator.of(context).pushNamed('/budget-planning');
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 20,
-                      horizontal: 20,
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(
-                          Icons.account_balance_wallet_rounded,
-                          color: AppColors.green,
-                          size: 32,
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            'Budget Planning',
-                            style: TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          color: AppColors.green,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: _DashboardBudgetPlanningButton(),
         ),
-        // Recent Transactions Card removed
-        // Dashboard content
         DashboardScreen(),
       ],
     );
   }
 
-  // RecentTransactionsCard is now a separate widget
-
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: _authService.authStateChanges,
-      builder: (context, userSnapshot) {
-        if (userSnapshot.connectionState == ConnectionState.waiting) {
-          // Show a loading indicator while waiting for auth state
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, state) {
         return Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
             child: Column(
               children: [
-                // App Bar
-                _buildAppBar(),
-                // Body Content
+                _buildAppBar(state),
                 Expanded(
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: SlideTransition(
                       position: _slideAnimation,
-                      child: _buildBody(),
+                      child: _buildBody(state),
                     ),
                   ),
                 ),
@@ -520,7 +449,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          floatingActionButton: _currentIndex == 3 || _currentIndex == 2
+          floatingActionButton:
+              state.currentIndex == 3 || state.currentIndex == 2
               ? null
               : FloatingActionButton(
                   heroTag: 'main-fab',
@@ -531,7 +461,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         builder: (context) => const AddTransactionScreen(),
                       ),
                     );
-                    // TODO: Refresh transactions after adding
                   },
                   backgroundColor: AppColors.green,
                   elevation: 4,
@@ -539,7 +468,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: const Icon(Icons.add, color: Colors.white, size: 32),
                 ),
           bottomNavigationBar: FloatingBottomNavigationBar(
-            currentIndex: _currentIndex,
+            currentIndex: state.currentIndex,
             onTap: _onTabTapped,
           ),
         );
@@ -560,4 +489,67 @@ class _BudgetWarning {
     required this.limit,
     required this.percent,
   });
+}
+
+// Extracted widget for const usage
+class _DashboardBudgetPlanningButton extends StatelessWidget {
+  const _DashboardBudgetPlanningButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              Navigator.of(context).pushNamed('/budget-planning');
+            },
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: AppColors.green,
+                    size: 32,
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Budget Planning',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: AppColors.green,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
