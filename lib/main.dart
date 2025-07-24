@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:money_manager/bloc/home/home_bloc.dart';
 import 'package:money_manager/core/routes.dart';
 import 'package:money_manager/core/services/firebase_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -8,7 +10,7 @@ void main() async {
   // Initialize Firebase
   await FirebaseService.initialize();
 
-  runApp(const MyApp());
+  runApp(BlocProvider(create: (_) => HomeBloc(), child: const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
