@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:money_manager/features/analytics/piechart.dart';
 import 'package:money_manager/features/analytics/summary_card.dart';
 import 'package:money_manager/core/widgets/category_icon.dart';
+import 'dart:ui';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -15,14 +16,18 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  bool showExpense = true;
-  late DateTime _selectedMonth;
+  String _analyticsMode = 'Day'; // 'Year', 'Month', 'Day'
+  late int _selectedYear;
+  late int _selectedMonth;
+  late DateTime _selectedDate;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _selectedMonth = DateTime(now.year, now.month);
+    _selectedYear = now.year;
+    _selectedMonth = now.month;
+    _selectedDate = DateTime(now.year, now.month, now.day);
   }
 
   @override
@@ -44,22 +49,46 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           return Center(child: Text('Error: \\${snapshot.error}'));
         }
         final docs = snapshot.data?.docs ?? [];
-        // Filter transactions to only those in the selected month
-        final monthDocs = docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final ts = data['dateCreated'];
-          if (ts is Timestamp) {
-            final date = ts.toDate();
-            return date.year == _selectedMonth.year &&
-                date.month == _selectedMonth.month;
-          }
-          return false;
-        }).toList();
+        // Filter transactions based on analytics mode
+        List<QueryDocumentSnapshot> filteredDocs;
+        if (_analyticsMode == 'Year') {
+          filteredDocs = docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final ts = data['dateCreated'];
+            if (ts is Timestamp) {
+              final date = ts.toDate();
+              return date.year == _selectedYear;
+            }
+            return false;
+          }).toList();
+        } else if (_analyticsMode == 'Month') {
+          filteredDocs = docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final ts = data['dateCreated'];
+            if (ts is Timestamp) {
+              final date = ts.toDate();
+              return date.year == _selectedYear && date.month == _selectedMonth;
+            }
+            return false;
+          }).toList();
+        } else {
+          filteredDocs = docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final ts = data['dateCreated'];
+            if (ts is Timestamp) {
+              final date = ts.toDate();
+              return date.year == _selectedDate.year &&
+                  date.month == _selectedDate.month &&
+                  date.day == _selectedDate.day;
+            }
+            return false;
+          }).toList();
+        }
         double totalIncome = 0;
         double totalExpense = 0;
         final Map<String, double> incomeByCategory = {};
         final Map<String, double> expenseByCategory = {};
-        for (final doc in monthDocs) {
+        for (final doc in filteredDocs) {
           final data = doc.data() as Map<String, dynamic>;
           final amount = (data['amount'] ?? 0).toDouble();
           final category = data['category'] ?? 'other';
@@ -101,16 +130,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Header with month selector
+              // Header with Overview and analytics icon
               Row(
-                children: [
-                  const Icon(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: const [
+                  Icon(
                     Icons.analytics_rounded,
                     color: AppColors.green,
                     size: 32,
                   ),
-                  const SizedBox(width: 12),
-                  const Text(
+                  SizedBox(width: 10),
+                  Text(
                     'Overview',
                     style: TextStyle(
                       fontSize: 24,
@@ -118,240 +149,360 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const Spacer(),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () async {
-                      final picked = await showMonthPicker(
-                        context: context,
-                        initialDate: _selectedMonth,
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _selectedMonth = picked;
-                        });
-                      }
-                    },
-                    child: Container(
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Analytics filter UI
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Card(
+                    color: AppColors.cardBackground,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
-                      decoration: BoxDecoration(
-                        color: AppColors.green.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
+                      child: Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 16,
+                        runSpacing: 12,
                         children: [
-                          Icon(
-                            Icons.calendar_today,
-                            color: AppColors.green,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_selectedMonth.month.toString().padLeft(2, '0')}/${_selectedMonth.year}',
+                          DropdownButton<String>(
+                            value: _analyticsMode,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'Year',
+                                child: Text('Year'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Month',
+                                child: Text('Month'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Day',
+                                child: Text('Day'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null)
+                                setState(() => _analyticsMode = val);
+                            },
                             style: const TextStyle(
-                              color: AppColors.green,
                               fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
                             ),
+                            dropdownColor: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          if (_analyticsMode == 'Year')
+                            DropdownButton<int>(
+                              value: _selectedYear,
+                              items:
+                                  List.generate(
+                                        12,
+                                        (i) => DateTime.now().year - 6 + i,
+                                      )
+                                      .map(
+                                        (y) => DropdownMenuItem(
+                                          value: y,
+                                          child: Text(y.toString()),
+                                        ),
+                                      )
+                                      .toList(),
+                              onChanged: (val) {
+                                if (val != null)
+                                  setState(() => _selectedYear = val);
+                              },
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                              dropdownColor: AppColors.cardBackground,
+                              borderRadius: BorderRadius.circular(12),
+                            )
+                          else if (_analyticsMode == 'Month')
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () async {
+                                final picked = await showMonthPicker(
+                                  context: context,
+                                  initialDate: DateTime(
+                                    _selectedYear,
+                                    _selectedMonth,
+                                  ),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    _selectedYear = picked.year;
+                                    _selectedMonth = picked.month;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.green.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      color: AppColors.green,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${_selectedMonth.toString().padLeft(2, '0')}/$_selectedYear',
+                                      style: const TextStyle(
+                                        color: AppColors.green,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else if (_analyticsMode == 'Day')
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: _selectedDate,
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime.now(),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: Theme.of(context).copyWith(
+                                            colorScheme: ColorScheme.light(
+                                              primary: AppColors.green,
+                                              onPrimary: Colors.white,
+                                              onSurface: AppColors.textPrimary,
+                                            ),
+                                            dialogBackgroundColor:
+                                                AppColors.cardBackground,
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        _selectedDate = picked;
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.green.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          color: AppColors.green,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${_selectedDate.day.toString().padLeft(2, '0')}/'
+                                          '${_selectedDate.month.toString().padLeft(2, '0')}/'
+                                          '${_selectedDate.year}',
+                                          style: const TextStyle(
+                                            color: AppColors.green,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                            ),
                         ],
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 20),
-              // Net Balance Summary with glassmorphism
-              Container(
-                decoration: BoxDecoration(
-                  color: netBalance < 0
-                      ? AppColors.red.withValues(alpha: 0.08)
-                      : AppColors.green.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (netBalance < 0 ? AppColors.red : AppColors.green)
-                          .withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 28,
-                    horizontal: 18,
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Net Balance',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                          color: netBalance < 0
-                              ? AppColors.red
-                              : AppColors.green,
+              // Net Balance Summary with glassmorphism and animated number
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Stack(
+                  children: [
+                    BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color:
+                              (netBalance < 0 ? AppColors.red : AppColors.green)
+                                  .withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.18),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  (netBalance < 0
+                                          ? AppColors.red
+                                          : AppColors.green)
+                                      .withOpacity(0.10),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 28,
+                            horizontal: 18,
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet_rounded,
+                                size: 32,
+                                color: netBalance < 0
+                                    ? AppColors.red
+                                    : AppColors.green,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Net Balance',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                  color: netBalance < 0
+                                      ? AppColors.red
+                                      : AppColors.green,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0, end: netBalance),
+                                duration: const Duration(milliseconds: 900),
+                                builder: (context, value, child) => Text(
+                                  format.format(value),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 28,
+                                    color: netBalance < 0
+                                        ? AppColors.red
+                                        : AppColors.green,
+                                    letterSpacing: -1.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        format.format(netBalance),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 28,
-                          color: netBalance < 0
-                              ? AppColors.red
-                              : AppColors.green,
-                          letterSpacing: -1.2,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Income & Expenses Row with progress bars
+              Builder(
+                builder: (context) {
+                  final total = totalIncome + totalExpense.abs();
+                  final incomeProgress = total > 0 ? totalIncome / total : 0.5;
+                  final expenseProgress = total > 0
+                      ? totalExpense.abs() / total
+                      : 0.5;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: AnalyticsSummaryCard(
+                          label: 'Income',
+                          amount: totalIncome,
+                          color: AppColors.green,
+                          icon: Icons.arrow_downward,
+                          progress: incomeProgress,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: AnalyticsSummaryCard(
+                          label: 'Expenses',
+                          amount: totalExpense.abs(),
+                          color: AppColors.red,
+                          icon: Icons.arrow_upward,
+                          progress: expenseProgress,
                         ),
                       ),
                     ],
-                  ),
+                  );
+                },
+              ),
+              // Only show breakdown and by category if there are transactions
+              if (filteredDocs.isNotEmpty) ...[
+                const SizedBox(height: 32),
+                // Switch button for pie chart
+                AnalyticsPieSection(
+                  expensePieData: expensePieData,
+                  incomePieData: incomePieData,
+                  colorMap: colorMap,
                 ),
-              ),
-              const SizedBox(height: 24),
-              // Income & Expenses Row
-              Row(
-                children: [
-                  Expanded(
-                    child: AnalyticsSummaryCard(
-                      label: 'Income',
-                      amount: totalIncome,
-                      color: AppColors.green,
-                      icon: Icons.arrow_downward,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: AnalyticsSummaryCard(
-                      label: 'Expenses',
-                      amount: totalExpense.abs(),
-                      color: AppColors.red,
-                      icon: Icons.arrow_upward,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              // Switch button for pie chart
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        showExpense = true;
-                      });
-                    },
-                    icon: Icon(
-                      Icons.pie_chart_rounded,
-                      color: showExpense ? AppColors.red : Colors.grey,
-                    ),
-                    label: Text(
-                      'Expense Breakdown',
+                Row(
+                  children: const [
+                    Icon(Icons.trending_up, color: AppColors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Income by Category',
                       style: TextStyle(
-                        color: showExpense ? AppColors.red : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    style: TextButton.styleFrom(
-                      backgroundColor: showExpense
-                          ? AppColors.red.withValues(alpha: 0.08)
-                          : Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        showExpense = false;
-                      });
-                    },
-                    icon: Icon(
-                      Icons.pie_chart_rounded,
-                      color: !showExpense ? AppColors.green : Colors.grey,
-                    ),
-                    label: Text(
-                      'Income Breakdown',
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...incomeByCategory.entries.map(
+                  (e) => _categoryTile(e.key, e.value, AppColors.green),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: const [
+                    Icon(Icons.trending_down, color: AppColors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Expenses by Category',
                       style: TextStyle(
-                        color: !showExpense ? AppColors.green : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    style: TextButton.styleFrom(
-                      backgroundColor: !showExpense
-                          ? AppColors.green.withValues(alpha: 0.08)
-                          : Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (child, animation) =>
-                    FadeTransition(opacity: animation, child: child),
-                child: showExpense && expensePieData.isNotEmpty
-                    ? AnalyticsPieChart(
-                        key: const ValueKey('expense'),
-                        chartKey: const ValueKey('expense'),
-                        label: 'Expense Breakdown',
-                        icon: Icons.pie_chart_rounded,
-                        iconColor: AppColors.red,
-                        dataMap: expensePieData,
-                        colorMap: colorMap,
-                      )
-                    : !showExpense && incomePieData.isNotEmpty
-                    ? AnalyticsPieChart(
-                        key: const ValueKey('income'),
-                        chartKey: const ValueKey('income'),
-                        label: 'Income Breakdown',
-                        icon: Icons.pie_chart_rounded,
-                        iconColor: AppColors.green,
-                        dataMap: incomePieData,
-                        colorMap: colorMap,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              Row(
-                children: const [
-                  Icon(Icons.trending_up, color: AppColors.green, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Income by Category',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...incomeByCategory.entries.map(
-                (e) => _categoryTile(e.key, e.value, AppColors.green),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: const [
-                  Icon(Icons.trending_down, color: AppColors.red, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Expenses by Category',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...expenseByCategory.entries.map(
-                (e) => _categoryTile(e.key, e.value, AppColors.red),
-              ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...expenseByCategory.entries.map(
+                  (e) => _categoryTile(e.key, e.value, AppColors.red),
+                ),
+              ],
             ],
           ),
         );
@@ -387,51 +538,81 @@ Future<DateTime?> showMonthPicker({
       int month = initialDate.month;
       return StatefulBuilder(
         builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Select Month'),
           content: SizedBox(
-            width: 300,
+            width: 320,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Year dropdown
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: () {
-                        setState(() {
-                          if (month == 1) {
-                            year--;
-                            month = 12;
-                          } else {
-                            month--;
-                          }
-                        });
-                      },
-                    ),
-                    Text(
-                      '$month/$year',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: () {
-                        setState(() {
-                          if (month == 12) {
-                            year++;
-                            month = 1;
-                          } else {
-                            month++;
-                          }
-                        });
+                    const Text('Year: '),
+                    DropdownButton<int>(
+                      value: year,
+                      items: List.generate(12, (i) => year - 6 + i)
+                          .map(
+                            (y) => DropdownMenuItem(
+                              value: y,
+                              child: Text(y.toString()),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => year = val);
                       },
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                // Month grid
+                GridView.count(
+                  crossAxisCount: 3,
+                  shrinkWrap: true,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: List.generate(12, (i) {
+                    final isSelected = (i + 1) == month;
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSelected
+                            ? AppColors.green
+                            : AppColors.paleGrey,
+                        foregroundColor: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: isSelected ? 4 : 0,
+                      ),
+                      onPressed: () => setState(() => month = i + 1),
+                      child: Text(
+                        [
+                          'Jan',
+                          'Feb',
+                          'Mar',
+                          'Apr',
+                          'May',
+                          'Jun',
+                          'Jul',
+                          'Aug',
+                          'Sep',
+                          'Oct',
+                          'Nov',
+                          'Dec',
+                        ][i],
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -442,8 +623,11 @@ Future<DateTime?> showMonthPicker({
                         Navigator.of(context).pop();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[200],
-                        foregroundColor: Colors.black,
+                        backgroundColor: AppColors.paleGrey,
+                        foregroundColor: AppColors.textPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: const Text('Reset'),
                     ),
@@ -452,6 +636,13 @@ Future<DateTime?> showMonthPicker({
                         selected = DateTime(year, month);
                         Navigator.of(context).pop();
                       },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.green,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                       child: const Text('Select'),
                     ),
                   ],
@@ -464,4 +655,118 @@ Future<DateTime?> showMonthPicker({
     },
   );
   return selected;
+}
+
+class AnalyticsPieSection extends StatefulWidget {
+  final Map<String, double> expensePieData;
+  final Map<String, double> incomePieData;
+  final Map<String, Color> colorMap;
+
+  const AnalyticsPieSection({
+    Key? key,
+    required this.expensePieData,
+    required this.incomePieData,
+    required this.colorMap,
+  }) : super(key: key);
+
+  @override
+  State<AnalyticsPieSection> createState() => _AnalyticsPieSectionState();
+}
+
+class _AnalyticsPieSectionState extends State<AnalyticsPieSection> {
+  bool showExpense = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    showExpense = true;
+                  });
+                },
+                icon: Icon(
+                  Icons.pie_chart_rounded,
+                  color: showExpense ? AppColors.red : Colors.grey,
+                ),
+                label: Text(
+                  'Expense Breakdown',
+                  style: TextStyle(
+                    color: showExpense ? AppColors.red : Colors.grey,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: showExpense
+                      ? AppColors.red.withOpacity(0.08)
+                      : Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    showExpense = false;
+                  });
+                },
+                icon: Icon(
+                  Icons.pie_chart_rounded,
+                  color: !showExpense ? AppColors.green : Colors.grey,
+                ),
+                label: Text(
+                  'Income Breakdown',
+                  style: TextStyle(
+                    color: !showExpense ? AppColors.green : Colors.grey,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: !showExpense
+                      ? AppColors.green.withOpacity(0.08)
+                      : Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          transitionBuilder: (child, animation) =>
+              FadeTransition(opacity: animation, child: child),
+          child: showExpense && widget.expensePieData.isNotEmpty
+              ? AnalyticsPieChart(
+                  key: const ValueKey('expense'),
+                  chartKey: const ValueKey('expense'),
+                  label: 'Expense Breakdown',
+                  icon: Icons.pie_chart_rounded,
+                  iconColor: AppColors.red,
+                  dataMap: widget.expensePieData,
+                  colorMap: widget.colorMap,
+                )
+              : !showExpense && widget.incomePieData.isNotEmpty
+              ? AnalyticsPieChart(
+                  key: const ValueKey('income'),
+                  chartKey: const ValueKey('income'),
+                  label: 'Income Breakdown',
+                  icon: Icons.pie_chart_rounded,
+                  iconColor: AppColors.green,
+                  dataMap: widget.incomePieData,
+                  colorMap: widget.colorMap,
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
 }
