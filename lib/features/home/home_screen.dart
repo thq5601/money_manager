@@ -4,24 +4,19 @@ import 'package:money_manager/widgets/bottom_navigation_bar.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dashboard/dashboard_screen.dart';
+import 'package:money_manager/features/home/dashboard/dashboard_screen.dart';
 import 'package:money_manager/features/transactions/transaction_screen.dart';
 import 'package:money_manager/features/transactions/add_transaction_screen.dart';
 import 'package:money_manager/features/analytics/analytics_screen.dart';
-import 'dart:ui';
-import 'widgets/filter_dialog.dart';
-import 'widgets/custom_app_bar.dart';
-import 'package:money_manager/core/widgets/category_icon.dart';
-import 'package:intl/intl.dart';
+import 'package:money_manager/features/home/widgets/filter_dialog.dart';
+import 'package:money_manager/features/home/widgets/custom_app_bar.dart';
+import 'package:money_manager/widgets/appbar_actions.dart';
+import 'package:money_manager/widgets/budget_warning_dialog.dart';
+import 'package:money_manager/widgets/dashboard_budget_planning_button.dart';
+import 'package:money_manager/core/models/budget_warning.dart';
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:money_manager/bloc/home/home_bloc.dart';
-
-final currencyFormatVND = NumberFormat.currency(
-  locale: 'vi_VN',
-  symbol: '₫',
-  decimalDigits: 0,
-);
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, this.initialTabIndex = 0});
@@ -38,14 +33,14 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _HomeScreenView extends StatefulWidget {
-  const _HomeScreenView({super.key});
+  const _HomeScreenView();
 
   @override
   State<_HomeScreenView> createState() => _HomeScreenViewState();
 }
 
 class _HomeScreenViewState extends State<_HomeScreenView>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late AnimationController _pageAnimationController;
   late Animation<Offset> _slideAnimation;
@@ -149,7 +144,7 @@ class _HomeScreenViewState extends State<_HomeScreenView>
             (spentByCategory[category] ?? 0) + amount.abs();
       }
     }
-    final List<_BudgetWarning> warnings = [];
+    final List<BudgetWarning> warnings = [];
     for (final doc in budgetsSnap.docs) {
       final data = doc.data();
       final category = data['category'] as String?;
@@ -159,7 +154,7 @@ class _HomeScreenViewState extends State<_HomeScreenView>
         final percent = spent / limit;
         if (percent >= 0.8) {
           warnings.add(
-            _BudgetWarning(
+            BudgetWarning(
               category: category,
               spent: spent,
               limit: limit,
@@ -221,90 +216,20 @@ class _HomeScreenViewState extends State<_HomeScreenView>
   }
 
   void _showBudgetWarningsDialog(List<dynamic> warnings) {
-    if (warnings.isEmpty) return;
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: const [
-              Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-              SizedBox(width: 8),
-              Text(
-                'Budget Warnings',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 340,
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: warnings.length,
-              separatorBuilder: (_, __) => const Divider(height: 18),
-              itemBuilder: (context, i) {
-                final w = warnings[i];
-                final color = w.percent >= 1.0 ? Colors.red : Colors.orange;
-                final format = currencyFormatVND;
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: color.withOpacity(0.13),
-                      child: CategoryIcon(category: w.category, color: color),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            w.category[0].toUpperCase() +
-                                w.category.substring(1),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            w.percent >= 1.0
-                                ? 'Above limit!'
-                                : 'Reached more than 80% of limit',
-                            style: TextStyle(
-                              color: color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Expensed: ${format.format(w.spent)} / ${format.format(w.limit)}',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Đóng'),
-            ),
-          ],
-        );
-      },
-    );
+    BudgetWarningDialog.show(context, warnings);
   }
 
   Widget _buildAppBar(HomeState state) {
     return CustomAppBar(
       title: _getAppBarTitle(state.currentIndex),
-      actions: _getAppBarActions(state),
+      actions: AppBarActions.getActions(
+        currentIndex: state.currentIndex,
+        onStartSearch: _startSearch,
+        onShowFilterDialog: _showFilterDialog,
+        onRefreshAnalytics: _refreshAnalytics,
+        budgetWarnings: state.budgetWarnings,
+        onShowBudgetWarningsDialog: _showBudgetWarningsDialog,
+      ),
       isSearching: _isSearching,
       searchController: _searchController,
       onSearchChanged: () {
@@ -336,64 +261,6 @@ class _HomeScreenViewState extends State<_HomeScreenView>
     }
   }
 
-  List<Widget> _getAppBarActions(HomeState state) {
-    if (state.currentIndex == 1) {
-      return [
-        IconButton(
-          onPressed: _startSearch,
-          icon: const Icon(Icons.search),
-          color: AppColors.textSecondary,
-        ),
-        IconButton(
-          onPressed: _showFilterDialog,
-          icon: const Icon(Icons.filter_list),
-          color: AppColors.textSecondary,
-        ),
-      ];
-    }
-    if (state.currentIndex == 2) {
-      return [
-        IconButton(
-          onPressed: _refreshAnalytics,
-          icon: const Icon(Icons.refresh),
-          color: AppColors.textSecondary,
-        ),
-      ];
-    }
-    // Notifications for dashboard
-    if (state.currentIndex == 0) {
-      return [
-        Stack(
-          children: [
-            IconButton(
-              onPressed: state.budgetWarnings.isNotEmpty
-                  ? () => _showBudgetWarningsDialog(state.budgetWarnings)
-                  : null,
-              icon: const Icon(Icons.notifications_outlined),
-              color: AppColors.textSecondary,
-            ),
-            if (state.budgetWarnings.isNotEmpty)
-              const Positioned(
-                right: 8,
-                top: 8,
-                child: SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ];
-    }
-    return const [];
-  }
-
   Widget _buildBody(HomeState state) {
     switch (state.currentIndex) {
       case 0:
@@ -419,12 +286,15 @@ class _HomeScreenViewState extends State<_HomeScreenView>
       children: const [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: _DashboardBudgetPlanningButton(),
+          child: DashboardBudgetPlanningButton(),
         ),
         DashboardScreen(),
       ],
     );
   }
+
+  // ...existing code...
+  // ...existing code...
 
   @override
   Widget build(BuildContext context) {
@@ -450,7 +320,7 @@ class _HomeScreenViewState extends State<_HomeScreenView>
           ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           floatingActionButton:
-              state.currentIndex == 3 || state.currentIndex == 2
+              (state.currentIndex == 3 || state.currentIndex == 2)
               ? null
               : FloatingActionButton(
                   heroTag: 'main-fab',
@@ -477,79 +347,4 @@ class _HomeScreenViewState extends State<_HomeScreenView>
   }
 }
 
-// Helper class for budget warnings
-class _BudgetWarning {
-  final String category;
-  final double spent;
-  final double limit;
-  final double percent;
-  _BudgetWarning({
-    required this.category,
-    required this.spent,
-    required this.limit,
-    required this.percent,
-  });
-}
-
-// Extracted widget for const usage
-class _DashboardBudgetPlanningButton extends StatelessWidget {
-  const _DashboardBudgetPlanningButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () {
-              Navigator.of(context).pushNamed('/budget-planning');
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: AppColors.green,
-                    size: 32,
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Budget Planning',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppColors.green,
-                    size: 20,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// ...existing code...
