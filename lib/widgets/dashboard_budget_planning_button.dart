@@ -33,11 +33,7 @@ class DashboardBudgetPlanningButton extends StatelessWidget {
               padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: AppColors.green,
-                    size: 32,
-                  ),
+                  Icon(Icons.pie_chart, color: AppColors.green, size: 32),
                   SizedBox(width: 16),
                   Expanded(
                     child: Text(

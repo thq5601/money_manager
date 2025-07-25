@@ -34,14 +34,7 @@ class CategorySelector extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(cat[0].toUpperCase() + cat.substring(1)),
-                  if (selectedCategory == cat) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.check,
-                      size: 16,
-                      color: AppColors.categoryColors[cat],
-                    ),
-                  ],
+                  // No checkmark
                 ],
               ),
               selected: selectedCategory == cat,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:money_manager/core/widgets/category_icon.dart';
 import 'package:intl/intl.dart';
 
