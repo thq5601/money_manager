@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:money_manager/features/home/home_screen.dart';
 
 // This file is already modular. DashboardScreen is exported for use in HomeScreen and elsewhere.
 // No code change needed unless you want to further split widgets.
@@ -280,80 +279,13 @@ class DashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 36),
                     // Transaction History header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Transaction History',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                PageRouteBuilder(
-                                  pageBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                      ) => const HomeScreen(initialTabIndex: 1),
-                                  transitionsBuilder:
-                                      (
-                                        context,
-                                        animation,
-                                        secondaryAnimation,
-                                        child,
-                                      ) {
-                                        final offsetAnimation =
-                                            Tween<Offset>(
-                                              begin: const Offset(1.0, 0.0),
-                                              end: Offset.zero,
-                                            ).animate(
-                                              CurvedAnimation(
-                                                parent: animation,
-                                                curve: Curves.easeOutCubic,
-                                              ),
-                                            );
-                                        final fadeAnimation = CurvedAnimation(
-                                          parent: animation,
-                                          curve: Curves.easeIn,
-                                        );
-                                        return SlideTransition(
-                                          position: offsetAnimation,
-                                          child: FadeTransition(
-                                            opacity: fadeAnimation,
-                                            child: child,
-                                          ),
-                                        );
-                                      },
-                                ),
-                              );
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                'See all',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: AppColors.green,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Transaction History',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     // Transaction list with glass effect and animation
