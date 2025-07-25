@@ -64,110 +64,103 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
     }
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: Container(
-          padding: const EdgeInsets.only(
-            top: 16,
-            left: 8,
-            right: 20,
-            bottom: 12,
-          ),
-          color: Colors.white,
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: AppColors.green,
-                  size: 24,
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.pie_chart, color: AppColors.green, size: 26),
+                const SizedBox(width: 10),
+                const Text(
+                  'Budget Planning',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                onPressed: () => Navigator.of(context).maybePop(),
-                splashRadius: 22,
-              ),
-              const Text(
-                'Budget Planning',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppColors.green),
-                tooltip: 'Reset all limits',
-                onPressed: () async {
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user == null) return;
-                  final budgetsSnap = await FirebaseFirestore.instance
-                      .collection('budgets')
-                      .where('userId', isEqualTo: user.uid)
-                      .get();
-                  final format = NumberFormat.currency(
-                    locale: 'vi_VN',
-                    symbol: '₫',
-                  );
-                  double totalLimit = 0;
-                  for (final doc in budgetsSnap.docs) {
-                    final data = doc.data();
-                    final limit = (data['limit'] ?? 0).toDouble();
-                    totalLimit += limit;
-                  }
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Reset All Budgets'),
-                      content: Text(
-                        'Are you sure you want to reset all budget limits to 0?\n\nCurrent total limit: \\${format.format(totalLimit)}',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Reset'),
-                        ),
-                      ],
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: AppColors.green),
+              tooltip: 'Reset all limits',
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) return;
+                final budgetsSnap = await FirebaseFirestore.instance
+                    .collection('budgets')
+                    .where('userId', isEqualTo: user.uid)
+                    .get();
+                final format = NumberFormat.currency(
+                  locale: 'vi_VN',
+                  symbol: '₫',
+                );
+                double totalLimit = 0;
+                for (final doc in budgetsSnap.docs) {
+                  final data = doc.data();
+                  final limit = (data['limit'] ?? 0).toDouble();
+                  totalLimit += limit;
+                }
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Reset All Budgets'),
+                    content: Text(
+                      'Are you sure you want to delete all budget data?\n\nCurrent total limit: ${format.format(totalLimit)}',
                     ),
-                  );
-                  if (confirm == true) {
-                    final batch = FirebaseFirestore.instance.batch();
-                    for (final doc in budgetsSnap.docs) {
-                      batch.update(doc.reference, {'limit': 0});
-                    }
-                    await batch.commit();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'All limit set to 0 ₫ (Previous: \\${format.format(totalLimit)})',
-                          ),
-                        ),
-                      );
-                    }
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Reset'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  final batch = FirebaseFirestore.instance.batch();
+                  for (final doc in budgetsSnap.docs) {
+                    batch.delete(doc.reference);
                   }
-                },
-              ),
-            ],
-          ),
+                  await batch.commit();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'All budget data has been permanently deleted. Previous total limit: \\${format.format(totalLimit)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        backgroundColor: Colors.red[400],
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
         ),
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
+
       body: StreamBuilder<List<Budget>>(
         stream: BudgetService.getBudgetsForUser(user.uid),
         builder: (context, snapshot) {
           final budgets = snapshot.data ?? [];
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                'Set your monthly spending limits for each category:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 18),
-              ...AppColors.categoryColors.keys.map((category) {
+          // Filter out income categories
+          final incomeCategories = ['salary', 'freelance', 'otherincome'];
+          // Build a list of category-budget pairs
+          final categoryBudgetPairs = AppColors.categoryColors.keys
+              .where(
+                (category) => !incomeCategories.contains(
+                  category.toLowerCase().replaceAll(' ', ''),
+                ),
+              )
+              .map((category) {
                 final budget = budgets.firstWhere(
                   (b) => b.category == category,
                   orElse: () => Budget(
@@ -177,6 +170,79 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                     limit: 0,
                   ),
                 );
+                return MapEntry(category, budget);
+              })
+              .toList();
+          // Sort: categories reaching/exceeding 100% first, then >=80%, then the rest
+          categoryBudgetPairs.sort((a, b) {
+            double aPercent = 0;
+            double bPercent = 0;
+            if (a.value.limit > 0) {
+              final spentA =
+                  budgets
+                          .firstWhere(
+                            (bud) => bud.category == a.key,
+                            orElse: () => Budget(
+                              id: '',
+                              userId: user.uid,
+                              category: a.key,
+                              limit: 0,
+                            ),
+                          )
+                          .limit >
+                      0
+                  ? _controllers[a.key]?.text.replaceAll(
+                          RegExp(r'[^0-9]'),
+                          '',
+                        ) ??
+                        '0'
+                  : '0';
+              aPercent = double.tryParse(spentA) ?? 0;
+              aPercent = aPercent / a.value.limit;
+            }
+            if (b.value.limit > 0) {
+              final spentB =
+                  budgets
+                          .firstWhere(
+                            (bud) => bud.category == b.key,
+                            orElse: () => Budget(
+                              id: '',
+                              userId: user.uid,
+                              category: b.key,
+                              limit: 0,
+                            ),
+                          )
+                          .limit >
+                      0
+                  ? _controllers[b.key]?.text.replaceAll(
+                          RegExp(r'[^0-9]'),
+                          '',
+                        ) ??
+                        '0'
+                  : '0';
+              bPercent = double.tryParse(spentB) ?? 0;
+              bPercent = bPercent / b.value.limit;
+            }
+            // Priority: >=100% first, then >=80%, then the rest
+            int aPriority = aPercent >= 1.0 ? 2 : (aPercent >= 0.8 ? 1 : 0);
+            int bPriority = bPercent >= 1.0 ? 2 : (bPercent >= 0.8 ? 1 : 0);
+            if (aPriority != bPriority) {
+              return bPriority.compareTo(aPriority);
+            }
+            // If same priority, sort by limit descending
+            return b.value.limit.compareTo(a.value.limit);
+          });
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              const Text(
+                'Set your monthly spending limits for each category:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 18),
+              ...categoryBudgetPairs.map((entry) {
+                final category = entry.key;
+                final budget = entry.value;
                 _controllers[category] ??= TextEditingController(
                   text: budget.limit > 0 ? budget.limit.toStringAsFixed(0) : '',
                 );
@@ -237,7 +303,9 @@ class _BudgetPlanningScreenState extends State<BudgetPlanningScreen> {
                                       keyboardType: TextInputType.number,
                                       inputFormatters: [VndInputFormatter()],
                                       decoration: InputDecoration(
-                                        labelText: 'Monthly Limit (VND)',
+                                        labelText: budget.limit > 0
+                                            ? 'Change Limit (VND)'
+                                            : 'Monthly Limit (VND)',
                                         border: OutlineInputBorder(
                                           borderRadius: BorderRadius.circular(
                                             12,
@@ -357,24 +425,41 @@ class _BudgetProgress extends StatelessWidget {
         }
         final percent = (spent / limit).clamp(0.0, 1.0);
         final format = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+        // Color logic: green < 80%, orange 80-99%, red >= 100%
+        Color progressColor;
+        if (percent < 0.8) {
+          progressColor = AppColors.green;
+        } else if (percent < 1.0) {
+          progressColor = Colors.orange;
+        } else {
+          progressColor = AppColors.red;
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: percent,
-                backgroundColor: Colors.grey[200],
-                color: percent < 1.0 ? AppColors.green : AppColors.red,
-                minHeight: 10,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                decoration: BoxDecoration(color: Colors.grey[200]),
+                child: LinearProgressIndicator(
+                  value: percent,
+                  backgroundColor: Colors.transparent,
+                  color: progressColor,
+                  minHeight: 10,
+                ),
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              'Spent: ${format.format(spent)} / ${format.format(limit)}',
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 500),
               style: TextStyle(
-                color: percent < 1.0 ? AppColors.green : AppColors.red,
+                color: progressColor,
                 fontWeight: FontWeight.w600,
+              ),
+              child: Text(
+                'Spent: ${format.format(spent)} / ${format.format(limit)}',
               ),
             ),
           ],
