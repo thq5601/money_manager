@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:money_manager/features/profile/profile.dart';
+import 'package:money_manager/features/profile/profile_screen.dart';
 import 'package:money_manager/widgets/bottom_navigation_bar.dart';
 import 'package:money_manager/core/theme/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
