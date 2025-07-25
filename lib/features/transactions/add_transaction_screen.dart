@@ -245,7 +245,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
-                          'Pleas select category*',
+                          'Select category*',
                           style: TextStyle(color: Colors.red),
                         ),
                       ),
