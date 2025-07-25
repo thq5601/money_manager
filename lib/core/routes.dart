@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:money_manager/features/account_manager/login/login_screen.dart';
 import 'package:money_manager/features/account_manager/sign_up/sign_up_screen.dart';
 import 'package:money_manager/features/home/home_screen.dart';
-import 'package:money_manager/features/profile/profile.dart';
+import 'package:money_manager/features/profile/profile_screen.dart';
 import 'package:money_manager/features/splash/splash_screen.dart';
 import 'package:money_manager/features/analytics/budget_planning_screen.dart';
 
